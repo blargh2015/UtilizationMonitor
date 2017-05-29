@@ -1,0 +1,11 @@
+{
+    "name": "UtilizationMonitor",
+    "version": "0.1.0",
+    "title": "Utilization Monitor",
+    "author": "Andras Suller",
+    "contact": "suller.andras@gmail.com",
+    "homepage": "",
+    "factorio_version": "0.15",
+    "dependencies": ["base >= 0.15"],
+    "description": "Displays utilization of factories, miners, labs and furnaces."
+}
