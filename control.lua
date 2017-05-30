@@ -80,8 +80,10 @@ function update_entity(entity, e)
     --[[
     game.print("last sec avg: " .. (global.sec_avg[id]:avg()*100) .. "%, last min avg: " .. (global.min_avg[id]:avg()*100))
     --]]
-    local percent = math.max(math.floor(global.min_avg[id]:avg()*100), 0)
-    entity.surface.create_entity{name = "statictext", position = label_position_for(entity), text = tostring(percent).."%"}
+    if global.show_labels then
+      local percent = math.max(math.floor(global.min_avg[id]:avg()*100), 0)
+      entity.surface.create_entity{name = "statictext", position = label_position_for(entity), text = tostring(percent).."%"}
+    end
   end
 end
 
@@ -93,6 +95,7 @@ function add_entity(entity)
 end
 
 function reset()
+  game.print("UtilizationMonitor: Full reset")
   global.version = VERSION
   global.entities = {}
 
@@ -100,6 +103,7 @@ function reset()
   global.min_avg = {}
   global.last_mining_progress = {}
   global.last_lab_durability = {}
+  global.show_labels = settings.global["utilization-monitor-enabled"].value
 
   for _, surface in pairs(game.surfaces) do
     for _, entity in pairs(surface.find_entities_filtered{type="assembling-machine"}) do
@@ -141,5 +145,27 @@ function on_built(e)
   end
 end
 
+local function on_configuration_changed(event)
+  --Any MOD has been changed/added/removed, including base game updates.
+  if event.mod_changes then
+    game.print("UtilizationMonitor: Game or mod version changes detected")
+    global.need_reset = true
+  end
+end
+
+local function update_settings(event)
+  if event.setting == "utilization-monitor-enabled" then
+    global.show_labels = settings.global["utilization-monitor-enabled"].value
+  end
+end
+
+local function on_toogle_utilization_monitor(event)
+  global.show_labels = not global.show_labels
+end
+
 script.on_event({defines.events.on_tick}, on_tick)
 script.on_event({defines.events.on_built_entity, defines.events.on_robot_built_entity}, on_built)
+
+script.on_configuration_changed(on_configuration_changed)
+script.on_event(defines.events.on_runtime_mod_setting_changed, update_settings)
+script.on_event("toggle-utilization-monitor", on_toogle_utilization_monitor)

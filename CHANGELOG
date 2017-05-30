@@ -1,0 +1,6 @@
+0.1.0 - 2017-05-28
+- First public version. Supports miners, labs, furnaces and factories. The percentages are displayed as floating text and shown for 60 ticks (one second). New labels are generated for every building once every 60 ticks, the previous labels automatically disappear after a second.
+
+0.2.0 - 2017-05-30
+- Added setting to enable/disable displaying the utilization percentages
+- Added CONTROL+U hotkey to toggle displaying the utilization percentages. The toggling is not immediate, it may take up to one second to see the show/hide because the labels are updated only once in every 60 ticks.
