@@ -55,7 +55,7 @@ function is_working(entity, id)
   elseif entity.type == "lab" then
     local sum_durability = 0.0
     local inventory = entity.get_inventory(defines.inventory.lab_input)
-    for i = 1, 7 do
+    for i = 1, #inventory do
       local item = inventory[i]
       if item.valid_for_read then
         sum_durability = sum_durability + item.durability
