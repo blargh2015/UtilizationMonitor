@@ -47,7 +47,7 @@ function is_working(entity, id)
   if entity.type == "furnace" then
     return entity.is_crafting() and entity.crafting_progress < 1.0
   elseif entity.type == "assembling-machine" then
-    return entity.is_crafting()
+    return entity.is_crafting() and entity.crafting_progress < 1.0
   elseif entity.type == "mining-drill" then
     local is_mining = (entity.mining_progress ~= global.last_mining_progress[id])
     global.last_mining_progress[id] = entity.mining_progress
