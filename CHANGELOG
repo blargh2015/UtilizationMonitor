@@ -4,3 +4,7 @@
 0.2.0 - 2017-05-30
 - Added setting to enable/disable displaying the utilization percentages
 - Added CONTROL+U hotkey to toggle displaying the utilization percentages. The toggling is not immediate, it may take up to one second to see the show/hide because the labels are updated only once in every 60 ticks.
+
+0.2.1 - 2017-06-04
+- Handle labs with any number of inventory slots, not only 7. This fixes compatibility with Dark Matter Replicator mod.
+- Fix progress monitoring for chemical plants.
