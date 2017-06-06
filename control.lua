@@ -113,7 +113,9 @@ function reset()
       add_entity(entity)
     end
     for _, entity in pairs(surface.find_entities_filtered{type="mining-drill"}) do
-      add_entity(entity)
+      if entity.name ~= "factory-port-marker" then -- ignore factorissimo2 arrows on factory buildings
+        add_entity(entity)
+      end
     end
     for _, entity in pairs(surface.find_entities_filtered{type="lab"}) do
       add_entity(entity)
