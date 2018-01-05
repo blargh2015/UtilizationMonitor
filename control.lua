@@ -44,15 +44,16 @@ local function label_position_for(entity)
 end
 
 function is_working(entity, id)
-  if entity.type == "furnace" then
+  local t = global.entity_types[id]
+  if t == "furnace" then
     return entity.is_crafting() and entity.crafting_progress < 1.0
-  elseif entity.type == "assembling-machine" then
+  elseif t == "assembling-machine" then
     return entity.is_crafting() and entity.crafting_progress < 1.0
-  elseif entity.type == "mining-drill" then
+  elseif t == "mining-drill" then
     local is_mining = (entity.mining_progress ~= global.last_mining_progress[id])
     global.last_mining_progress[id] = entity.mining_progress
     return is_mining
-  elseif entity.type == "lab" then
+  elseif t == "lab" then
     local sum_durability = 0.0
     local inventory = entity.get_inventory(defines.inventory.lab_input)
     for i = 1, #inventory do
@@ -67,8 +68,7 @@ function is_working(entity, id)
   end
 end
 
-function update_entity(entity, e)
-  local id = entity.unit_number
+function update_entity(entity, id, e)
   local is_working = (is_working(entity, id) and 1 or 0)
   if global.sec_avg[id].add == nil then -- after loading the save game the add method is not defined :(
     global.need_reset = true
@@ -90,6 +90,8 @@ end
 function add_entity(entity)
   local id = entity.unit_number
   global.entities[id] = entity
+  global.entity_types[id] = entity.type
+  global.entity_positions[id] = entity.position
   global.sec_avg[id] = MovingAvg(60)
   global.min_avg[id] = MovingAvg(60)
 end
@@ -98,6 +100,8 @@ function reset()
   game.print("UtilizationMonitor: Full reset")
   global.version = VERSION
   global.entities = {}
+  global.entity_types = {}
+  global.entity_positions = {}
 
   global.sec_avg = {}
   global.min_avg = {}
@@ -126,15 +130,17 @@ end
 function on_tick(e)
   if global.need_reset or (global.version ~= VERSION) or
      (type(global.entities) ~= "table") or (type(global.sec_avg) ~= "table") or (type(global.min_avg) ~= "table") or
-     (type(global.last_mining_progress) ~= "table") or (type(global.last_lab_durability) ~= "table") then
+     (type(global.last_mining_progress) ~= "table") or (type(global.last_lab_durability) ~= "table") or
+     (type(global.entity_types) ~= "table") or (type(global.entity_positions) ~= "table") then
     global.need_reset = nil
     reset()
   end
+
   for id, entity in pairs(global.entities) do
     if not entity.valid then
       global.entities[id] = nil
     else
-      update_entity(entity, e)
+      update_entity(entity, id, e)
     end
   end
 end
