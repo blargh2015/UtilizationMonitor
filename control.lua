@@ -43,15 +43,17 @@ local function label_position_for(entity)
   return {x = entity.position.x + left_top.x, y = entity.position.y + left_top.y}
 end
 
-function is_working(entity, id)
-  local t = global.entity_types[id]
+function is_working(data, id)
+  local entity = data.entity
+  local t = data.type
   if t == "furnace" then
     return entity.is_crafting() and entity.crafting_progress < 1.0
   elseif t == "assembling-machine" then
     return entity.is_crafting() and entity.crafting_progress < 1.0
   elseif t == "mining-drill" then
-    local is_mining = (entity.mining_progress ~= global.last_mining_progress[id])
-    global.last_mining_progress[id] = entity.mining_progress
+    local lmp = entity.mining_progress
+    local is_mining = (lmp ~= data.last_mining_progress)
+    data.last_mining_progress = lmp
     return is_mining
   elseif t == "lab" then
     local sum_durability = 0.0
@@ -62,32 +64,32 @@ function is_working(entity, id)
         sum_durability = sum_durability + item.durability
       end
     end
-    local is_mining = (sum_durability ~= global.last_lab_durability[id])
-    global.last_lab_durability[id] = sum_durability
+    local is_mining = (sum_durability ~= data.last_lab_durability)
+    data.last_lab_durability = sum_durability
     return is_mining
   end
 end
 
-function update_entity(entity, id, tick, time_strech)
-  local is_working = (is_working(entity, id) and 1 or 0)
-  if global.sec_avg[id].add == nil then -- after loading the save game the add method is not defined :(
+function update_entity(data, id, tick, time_strech)
+  local is_working = (is_working(data, id) and 1 or 0)
+  if data.sec_avg.add == nil then -- after loading the save game the add method is not defined :(
     global.need_reset = true
     return
   end
   for i = 1, time_strech do
-    global.sec_avg[id]:add(is_working)
+    data.sec_avg:add(is_working)
   end
   if tick % 60 < time_strech then
-    global.min_avg[id]:add(global.sec_avg[id]:avg())
+    data.min_avg:add(data.sec_avg:avg())
     --[[
-    game.print("last sec avg: " .. (global.sec_avg[id]:avg()*100) .. "%, last min avg: " .. (global.min_avg[id]:avg()*100))
+    game.print("last sec avg: " .. (data.sec_avg:avg()*100) .. "%, last min avg: " .. (data.min_avg:avg()*100))
     --]]
     if global.show_labels then
-      local percent = math.max(math.floor(global.min_avg[id]:avg()*100), 0)
-      if global.entity_labels[id] == nil then
-        global.entity_labels[id] = entity.surface.create_entity{name = "statictext", position = label_position_for(entity), text = tostring(percent).."%"}
+      local percent = math.max(math.floor(data.min_avg:avg()*100), 0)
+      if data.label == nil then
+        data.label = data.entity.surface.create_entity{name = "statictext", position = label_position_for(data.entity), text = tostring(percent).."%"}
       else
-        global.entity_labels[id].text = percent .. "%"
+        data.label.text = percent .. "%"
       end
     end
   end
@@ -95,45 +97,28 @@ end
 
 function add_entity(entity)
   local id = entity.unit_number
-  global.entities[id] = entity
-  global.entity_types[id] = entity.type
-  global.entity_positions[id] = entity.position
-  global.entity_last_ticks[id] = global.tick
-  global.sec_avg[id] = MovingAvg(60)
-  global.min_avg[id] = MovingAvg(60)
+  global.entity_data[id] = {
+    entity = entity,
+    type = entity.type,
+    last_tick = global.tick,
+    sec_avg = MovingAvg(60),
+    min_avg = MovingAvg(60)
+  }
 end
 
 function remove_entity(id)
-  global.entities[id] = nil
-  global.entity_types[id] = nil
-  global.entity_positions[id] = nil
-  global.entity_last_ticks[id] = nil
-  local label = global.entity_labels[id]
-  if label and label.valid then
-    label.destroy()
+  local data = global.entity_data[id]
+  if data and data.label and data.label.valid then
+    data.label.destroy()
   end
-  global.entity_labels[id] = nil
-  global.sec_avg[id] = nil
-  global.min_avg[id] = nil
-  global.last_mining_progress[id] = nil
-  global.last_lab_durability[id] = nil
 end
 
 function reset()
   game.print("UtilizationMonitor: Full reset")
   global.version = VERSION
   global.last_id = nil
-  global.entities = {}
-  global.entity_types = {}
-  global.entity_positions = {}
-  global.entity_last_ticks = {}
-  global.entity_labels = {}
+  global.entity_data = {}
   global.entities_per_tick = settings.global["utilization-monitor-entities-per-tick"].value -- probability to process entities far from players
-
-  global.sec_avg = {}
-  global.min_avg = {}
-  global.last_mining_progress = {}
-  global.last_lab_durability = {}
   global.show_labels = settings.global["utilization-monitor-enabled"].value
 
   local count = 0
@@ -163,37 +148,35 @@ end
 function on_tick(e)
   local tick = e.tick
   global.tick = tick
-  if global.need_reset or (global.version ~= VERSION) or
-     (type(global.entities) ~= "table") or (type(global.sec_avg) ~= "table") or (type(global.min_avg) ~= "table") or
-     (type(global.last_mining_progress) ~= "table") or (type(global.last_lab_durability) ~= "table") or
-     (type(global.entity_types) ~= "table") or (type(global.entity_positions) ~= "table") or
-     (type(global.entity_last_ticks) ~= "table") or (type(global.entity_labels) ~= "table") then
+  if global.need_reset or (global.version ~= VERSION) or (type(global.entity_data) ~= "table") then
     global.need_reset = nil
     reset()
   end
 
-  local entities = global.entities
-  local entity_last_ticks = global.entity_last_ticks
+  local entity_data = global.entity_data
   local id = global.last_id
-  local entity
+  local data
 
   if id then
-    entity = entities[id]
+    data = entity_data[id]
   else
-    id, entity = next(entities, nil)
+    id, data = next(entity_data, nil)
   end
 
   for i = 1, global.entities_per_tick do
     if id == nil then
       break
     end
-    if entity.valid then
-      update_entity(entity, id, tick, math.min(tick - entity_last_ticks[id], 10))
-      entity_last_ticks[id] = tick
+    if data.entity.valid then
+      update_entity(data, id, tick, math.min(tick - data.last_tick, 10))
+      data.last_tick = tick
     else
       remove_entity(id)
     end
-    id, entity = next(entities, id)
+    if i == global.entities_per_tick then
+      break
+    end
+    id, data = next(entity_data, id)
   end
   global.last_id = id
 end
@@ -224,7 +207,7 @@ local function update_settings(event)
 end
 
 local function on_toogle_utilization_monitor(event)
-  global.show_labels = not global.show_labels
+  global.show_labels = not global.show_labels -- TODO fix this
 end
 
 script.on_event({defines.events.on_tick}, on_tick)
