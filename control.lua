@@ -1,41 +1,23 @@
-local VERSION = "0.1.0"
+local VERSION = "0.2.0"
 
-MovingAvg = {}
-MovingAvg.__index = MovingAvg
-
-setmetatable(MovingAvg, {
-  __call = function(class, ...)
-          local self = setmetatable({},class)
-          self:_init(...)
-          return self
-  end
-})
-
-function MovingAvg:_init(capacity)
-  self.capacity = capacity
-  self.values = {}
-  self.next_index = 0
-  self.total = 0
-  self.count = 0
-end
-
-function MovingAvg:add(value)
-  if self.count >= self.capacity then
-    self.total = self.total - self.values[self.next_index] + value
+function add(avg, value)
+  if avg.count >= avg.capacity then
+    avg.total = avg.total - avg.values[avg.next_index+1] + value
   else
-    self.count = self.count + 1
-    self.total = self.total + value
+    avg.count = avg.count + 1
+    avg.total = avg.total + value
   end
-  self.values[self.next_index] = value
-  self.next_index = self.next_index + 1
-  if self.next_index >= self.capacity then
-    self.next_index = 0
+  avg.values[avg.next_index+1] = value
+  avg.next_index = avg.next_index + 1
+  if avg.next_index >= avg.capacity then
+    avg.next_index = 0
   end
 end
 
-function MovingAvg:avg()
-  return self.total / self.count
+function average(avg)
+  return avg.total / avg.count
 end
+
 
 local function label_position_for(entity)
   local left_top = entity.prototype.selection_box.left_top
@@ -70,26 +52,21 @@ function is_working(data, id)
   end
 end
 
-function update_entity(data, id, tick, time_strech)
+function update_entity(data, id, tick, time_stretch)
   local is_working = (is_working(data, id) and 1 or 0)
-  if data.sec_avg.add == nil then -- after loading the save game the add method is not defined :(
-    global.need_reset = true
-    return
+  local sec_avg = data.sec_avg
+  local old_index = sec_avg.next_index
+  for i = 1, time_stretch do
+    add(sec_avg, is_working)
   end
-  for i = 1, time_strech do
-    data.sec_avg:add(is_working)
-  end
-  if tick % 60 < time_strech then
-    data.min_avg:add(data.sec_avg:avg())
-    --[[
-    game.print("last sec avg: " .. (data.sec_avg:avg()*100) .. "%, last min avg: " .. (data.min_avg:avg()*100))
-    --]]
+  if sec_avg.next_index < old_index then
+    add(data.min_avg, average(sec_avg))
     if global.show_labels then
-      local percent = math.max(math.floor(data.min_avg:avg()*100), 0)
+      local percent = math.max(math.floor(average(data.min_avg)*100), 0)
       if data.label == nil then
-        data.label = data.entity.surface.create_entity{name = "statictext", position = label_position_for(data.entity), text = tostring(percent).."%"}
+        data.label = data.entity.surface.create_entity{name = "statictext", position = label_position_for(data.entity), text = percent.."%"}
       else
-        data.label.text = percent .. "%"
+        data.label.text = percent.."%"
       end
     end
   end
@@ -101,8 +78,8 @@ function add_entity(entity)
     entity = entity,
     type = entity.type,
     last_tick = global.tick,
-    sec_avg = MovingAvg(60),
-    min_avg = MovingAvg(60)
+    sec_avg = { capacity = 60, values = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, next_index = 0, total = 0, count = 0 },
+    min_avg = { capacity = 60, values = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, next_index = 0, total = 0, count = 0 }
   }
 end
 
