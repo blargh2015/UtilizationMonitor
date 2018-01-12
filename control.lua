@@ -47,12 +47,18 @@ end
 
 local function is_working_furnance(data)
   local entity = data.entity
-  return entity.is_crafting() and entity.crafting_progress < 1.0
+  local lcp = entity.crafting_progress
+  local is_crafting = (lcp ~= data.last_crafting_progress)
+  data.last_crafting_progress = lcp
+  return is_crafting
 end
 
-local function is_working_assembly_maschine(data)
+local function is_working_assembly_machine(data)
   local entity = data.entity
-  return entity.is_crafting() and entity.crafting_progress < 1.0
+  local lcp = entity.crafting_progress
+  local is_crafting = (lcp ~= data.last_crafting_progress)
+  data.last_crafting_progress = lcp
+  return is_crafting
 end
 
 local function is_working_mining_drill(data)
@@ -82,7 +88,7 @@ local function get_is_working_function(t)
   if t == "furnace" then
     return is_working_furnance
   elseif t == "assembling-machine" then
-    return is_working_assembly_maschine
+    return is_working_assembly_machine
   elseif t == "mining-drill" then
     return is_working_mining_drill
   elseif t == "lab" then
