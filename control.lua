@@ -134,6 +134,16 @@ end
 
 local function reset()
   game.print("UtilizationMonitor: Full reset")
+  -- clean up data used in earlier mod versions to make savegames smaller
+  global.entities = nil
+  global.entity_types = nil
+  global.entity_positions = nil
+  global.sec_avg = nil
+  global.min_avg = nil
+  global.last_mining_progress = nil
+  global.last_lab_durability = nil
+  -- end cleanup
+
   global.version = VERSION
   global.last_id = nil
   -- Purge old labels
