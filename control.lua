@@ -115,7 +115,6 @@ local function add_entity(entity)
   local id = entity.unit_number
   local data = {
     entity = entity,
-    type = entity.type,
     is_working = get_is_working_function(entity.type),
     sec_avg = { capacity = 60, values = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, next_index = 1, total = 0, count = 0 },
     min_avg = { capacity = 60, values = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, next_index = 1, total = 0, count = 0 },
