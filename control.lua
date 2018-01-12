@@ -132,6 +132,14 @@ local function remove_entity(id)
   remove_label(data)
 end
 
+local function entity_moved(event, data)
+  data = global.entity_data[event.moved_entity.unit_number]
+  if data and data.label and data.label.valid then
+    local position = label_position_for(event.moved_entity)
+    data.label.teleport(position)
+  end
+end
+
 local function reset()
   game.print("UtilizationMonitor: Full reset")
   -- clean up data used in earlier mod versions to make savegames smaller
@@ -184,8 +192,20 @@ end
 
 -- event functions
 
+--[[Init Events]]
+local function register_conditional_events()
+  if remote.interfaces["picker"] and remote.interfaces["picker"]["dolly_moved_entity_id"] then
+    script.on_event(remote.call("picker", "dolly_moved_entity_id"), entity_moved)
+  end
+end
+
 local function on_init()
   global.need_reset = true
+  register_conditional_events()
+end
+
+local function on_load()
+  register_conditional_events()
 end
 
 local function on_tick(e)
@@ -263,6 +283,7 @@ local function on_toogle_utilization_monitor(event)
 end
 
 script.on_init(on_init)
+script.on_load(on_load)
 script.on_event({defines.events.on_tick}, on_tick)
 script.on_event({defines.events.on_built_entity, defines.events.on_robot_built_entity}, on_built)
 
