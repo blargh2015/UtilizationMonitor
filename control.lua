@@ -28,7 +28,7 @@ local function label_position_for(entity)
 end
 
 local function format_label(value)
-  return math.floor(value * 100) .. "%"
+  return math.max(math.floor(value * 100), 0) .. "%"
 end
 
 local function add_label(data)
