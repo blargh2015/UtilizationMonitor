@@ -1,16 +1,94 @@
+-- The version of the data of this mod.
+-- If this value does not match the data have to be reset.
 local VERSION = "0.3.0"
+--[[--
+UM data definition:
 
--- util functions
 
+
+global:
+
+-- The last/currently running UMData version.
+global.version : string
+
+-- The last id of the entity that was updated.
+global.last_id : uint
+
+-- The main data container with all tracked entity data.
+global.entity_data : Table<UMData>
+
+-- The current iteration for the data (required for iterations_per_update)
+global.iteration : uint
+
+-- Whether to show the labels or not
+global.show_labels : boolean (configurable)
+
+-- Limits the total count of entities to be processed per tick. The other entities will be processed in the next tick.
+global.entities_per_tick : uint (configurable)
+
+-- After how many iterations the long term average and labels should be updated.
+global.iterations_per_update : uint (configurable)
+
+
+
+UMData:
+
+-- The entity that will by tracked by this data.
+UMData.entity : Entity
+
+-- A function that can be used to calculate whether the entity is currently working
+UMData.is_working : function(UMData):boolean
+
+-- The short term average processing time.
+UMData.sec_avg : UMAvg
+
+-- The long term average processing time.
+UMData.min_avg : UMAvg
+
+-- The label for the entity associated with this data entry.
+UMData.label = Entity or nil
+
+
+
+UMAvg:
+
+-- The length of values for performance reasons.
+UMAvg.capacity : uint
+
+-- The working states during the last n measurements.
+UMAvg.values : Array<numeric>
+
+-- The next index of the values array that should be overwritten.
+UMAvg.next_index = 1
+
+-- The sum of values for performance reasons.
+UMAvg.total = 0
+
+]]
+
+-----------------------
+-- Utility functions --
+-----------------------
+
+--- Adds the given value to the given average holder.
+--
+-- @param avg:UMAvg - The average holder to update.
+-- @param value:numeric - The value to add to the average.
+--
 local function add(avg, value)
   local index = avg.next_index
   local total = avg.total - avg.values[index] + value
-  local capacity = avg.capacity
   avg.total = total
   avg.values[index] = value
-  avg.next_index = index % capacity + 1
+  avg.next_index = index % avg.capacity + 1
 end
 
+--- Adds the given value to the given average holder and returns the current average.
+--
+-- @param avg:UMAvg - The average holder to update.
+-- @param value:numeric - The value to add to the average.
+-- @returns numeric - The current average as specified by the average holder.
+--
 local function add2(avg, value)
   local index = avg.next_index
   local total = avg.total - avg.values[index] + value
@@ -21,83 +99,137 @@ local function add2(avg, value)
   return total / capacity
 end
 
+--- Calculates the label position for the given entity.
+--
+-- @param entity:Entity - The entity to calculate the label position for.
+--
 local function label_position_for(entity)
   local left_top = entity.prototype.selection_box.left_top
   --top left corner
   return {x = entity.position.x + left_top.x, y = entity.position.y + left_top.y}
 end
 
+--- Formats the given value to be used as label text.
+--
+-- @param value:numeric - The numeric value representing the average working state. Expects values between 0 and 1.
+-- @returns string - The new text for the label.
+--
 local function format_label(value)
   return math.max(math.floor(value * 100), 0) .. "%"
 end
 
+--- Creates a label for the entity associated with the given data.
+--
+-- @param data:UMData - The data associated with the entity the label should be created for.
+--
 local function add_label(data)
   local entity = data.entity
   local percent = data.min_avg.total / data.min_avg.capacity
   data.label = entity.surface.create_entity{name = "statictext", position = label_position_for(entity), text = format_label(percent)}
 end
 
+--- Removes the label for the entity associated with the given data if it does exist.
+--
+-- @param data:UMData - The data associated with the entity the label should be removed from.
+--
 local function remove_label(data)
   if data and data.label and data.label.valid then
     data.label.destroy()
   end
 end
 
--- is working functions
+--------------------------
+-- Is working functions --
+--------------------------
 
+--- Calculates whether the furnace associated with the given data is currently working.
+--
+-- @param data:UMData - The data associated with the furnace.
+-- @return boolean - Whether the furnace is currently working or not.
+--
 local function is_working_furnance(data)
-  local entity = data.entity
-  local lcp = entity.crafting_progress
-  local is_crafting = (lcp ~= data.last_crafting_progress)
-  data.last_crafting_progress = lcp
-  return is_crafting
+  local progress = data.entity.crafting_progress
+  local is_working = (progress ~= data.last_progress)
+  data.last_progress = progress
+  return is_working
 end
 
+--- Calculates whether the assembly machine associated with the given data is currently working.
+--
+-- @param data:UMData - The data associated with the assembly machine.
+-- @return boolean - Whether the assembly machine is currently working or not.
+--
 local function is_working_assembly_machine(data)
-  local entity = data.entity
-  local lcp = entity.crafting_progress
-  local is_crafting = (lcp ~= data.last_crafting_progress)
-  data.last_crafting_progress = lcp
-  return is_crafting
+  local progress = data.entity.crafting_progress
+  local is_working = (progress ~= data.last_progress)
+  data.last_progress = progress
+  return is_working
 end
 
+--- Calculates whether the mining drill associated with the given data is currently working.
+--
+-- @param data:UMData - The data associated with the mining drill.
+-- @return boolean - Whether the mining drill is currently working or not.
+--
 local function is_working_mining_drill(data)
-  local entity = data.entity
-  local lmp = entity.mining_progress
-  local is_mining = (lmp ~= data.last_mining_progress)
-  data.last_mining_progress = lmp
-  return is_mining
+  local progress = data.entity.mining_progress
+  local is_working = (progress ~= data.last_progress)
+  data.last_progress = progress
+  return is_working
 end
 
+--- Calculates whether the lab associated with the given data is currently working.
+--
+-- @param data:UMData - The data associated with the lab.
+-- @return boolean - Whether the lab is currently working or not.
+--
 local function is_working_lab(data)
-  local entity = data.entity
   local sum_durability = 0.0
-  local inventory = entity.get_inventory(defines.inventory.lab_input)
+  local inventory = data.entity.get_inventory(defines.inventory.lab_input)
+  -- Count the remaining durability of all research items
   for i = 1, #inventory do
     local item = inventory[i]
     if item.valid_for_read then
       sum_durability = sum_durability + item.durability
     end
   end
-  local is_mining = (sum_durability ~= data.last_lab_durability)
-  data.last_lab_durability = sum_durability
-  return is_mining
+  local is_working = (sum_durability ~= data.last_progress)
+  data.last_progress = sum_durability
+  return is_working
 end
 
-local function get_is_working_function(t)
+--- Gets the function for calculating the working state of the given entity.
+--
+-- @param entity:Entity - The entity for which the function should be searched.
+-- @return function - The function used to calculate the working state of the entity or nil if it is unsupported.
+--
+local function get_is_working_function(entity)
+  local t = entity.type
   if t == "furnace" then
     return is_working_furnance
   elseif t == "assembling-machine" then
     return is_working_assembly_machine
   elseif t == "mining-drill" then
+    if entity.name == "factory-port-marker" then
+      -- ignore factorissimo2 arrows on factory buildings
+      return nil
+    end
     return is_working_mining_drill
   elseif t == "lab" then
     return is_working_lab
   end
+  return nil
 end
 
--- actual codee
+-----------------
+-- Actual code --
+-----------------
 
+--- Update the data for the given entity.
+--
+-- @param data:UMData - The data object which contains all data that should be updated.
+-- @param update:boolean - Whether the long term data and label should be updated.
+--
 function update_entity(data, update)
   local is_working = (data.is_working(data) and 1 or 0)
   if update then
@@ -111,20 +243,46 @@ function update_entity(data, update)
   end
 end
 
+--- Adds an entity to be tracked by UM.
+--
+-- @param entity:Entity - The entity to track
+-- @return boolean - Whether the given entity was supported and tracked.
+--
 local function add_entity(entity)
-  local id = entity.unit_number
-  local data = {
-    entity = entity,
-    is_working = get_is_working_function(entity.type),
-    sec_avg = { capacity = 60, values = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, next_index = 1, total = 0, count = 0 },
-    min_avg = { capacity = 60, values = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, next_index = 1, total = 0, count = 0 },
-  }
-  if global.show_labels then
-    add_label(data)
+  local is_working_function = get_is_working_function(entity)
+  if is_working_function then
+    local id = entity.unit_number
+    local data = {
+      entity = entity,
+      is_working = is_working_function,
+      sec_avg = { capacity = 60, values = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, next_index = 1, total = 0},
+      min_avg = { capacity = 60, values = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, next_index = 1, total = 0},
+    }
+    if global.show_labels then
+      add_label(data)
+    end
+    global.entity_data[id] = data
+    return true
   end
-  global.entity_data[id] = data
+  return false
 end
 
+--- Post-Processes the movement of the given entity.
+--
+-- @param entity:Entity - The entity that was moved.
+--
+local function move_entity(entity)
+  local data = global.entity_data[entity.unit_number]
+  if data and data.label and data.label.valid then
+    local position = label_position_for(entity)
+    data.label.teleport(position)
+  end
+end
+
+--- Remove the given entity from being tracked by UM.
+--
+-- @param id:uint - The id of the entity to stop tracking.
+--
 local function remove_entity(id)
   local data = global.entity_data[id]
   global.entity_data[id] = nil -- Prevent memory leaks
@@ -132,14 +290,8 @@ local function remove_entity(id)
   remove_label(data)
 end
 
-local function entity_moved(event, data)
-  data = global.entity_data[event.moved_entity.unit_number]
-  if data and data.label and data.label.valid then
-    local position = label_position_for(event.moved_entity)
-    data.label.teleport(position)
-  end
-end
-
+--- Hard resets all data used by UM.
+--
 local function reset()
   game.print("UtilizationMonitor: Full reset")
   -- clean up data used in earlier mod versions to make savegames smaller
@@ -162,40 +314,70 @@ local function reset()
   end
   global.entity_data = {}
   global.iteration = 0
-  global.entities_per_tick = settings.global["utilization-monitor-entities-per-tick"].value -- probability to process entities far from players
-  global.show_labels = settings.global["utilization-monitor-enabled"].value
-  global.iterations_per_update = 60 -- TODO Move to config
+  global.show_labels = settings.global["utilization-monitor-show-labels"].value
+  global.entities_per_tick = settings.global["utilization-monitor-entities-per-tick"].value
+  global.iterations_per_update = settings.global["utilization-monitor-entities-per-tick"].value
 
   local count = 0
   for _, surface in pairs(game.surfaces) do
     for _, entity in pairs(surface.find_entities_filtered{type="assembling-machine"}) do
-      add_entity(entity)
-      count = count + 1
+      if add_entity(entity) then
+        count = count + 1
+      end
     end
     for _, entity in pairs(surface.find_entities_filtered{type="furnace"}) do
-      add_entity(entity)
-      count = count + 1
+      if add_entity(entity) then
+        count = count + 1
+      end
     end
     for _, entity in pairs(surface.find_entities_filtered{type="mining-drill"}) do
-      if entity.name ~= "factory-port-marker" then -- ignore factorissimo2 arrows on factory buildings
-        add_entity(entity)
+      if add_entity(entity) then
         count = count + 1
       end
     end
     for _, entity in pairs(surface.find_entities_filtered{type="lab"}) do
-      add_entity(entity)
-      count = count + 1
+      if add_entity(entity) then
+        count = count + 1
+      end
     end
   end
   game.print("UtilizationMonitor: found " .. count .. " entities")
 end
 
--- event functions
+-----------------------------
+-- Configuration functions --
+-----------------------------
+
+--- Updates the show_labels option and executes the necessary operations (remove/add labels).
+--
+-- @param value:boolean - Whether to show the labels or not.
+--
+local function update_show_labels(value)
+  global.show_labels = value
+  -- Purge old labels
+  for _, data in pairs(global.entity_data) do
+    remove_label(data)
+  end
+  -- Recreate labels
+  if global.show_labels then
+    for _, data in pairs(global.entity_data) do
+      add_label(data)
+    end
+  end
+end
+
+---------------------
+-- Event functions --
+---------------------
+
+local function on_dolly_moved_entity(event)
+  moved_entity(event.moved_entity)
+end
 
 --[[Init Events]]
 local function register_conditional_events()
   if remote.interfaces["picker"] and remote.interfaces["picker"]["dolly_moved_entity_id"] then
-    script.on_event(remote.call("picker", "dolly_moved_entity_id"), entity_moved)
+    script.on_event(remote.call("picker", "dolly_moved_entity_id"), on_dolly_moved_entity)
   end
 end
 
@@ -208,15 +390,21 @@ local function on_load()
   register_conditional_events()
 end
 
-local function on_tick(e)
+local function on_tick(event)
+  -- Check state
   if global.need_reset then
     global.need_reset = nil
     reset()
     return
   end
-  local next = next
 
+  -- Prepare for faster access
+  local next = next
   local entity_data = global.entity_data
+  local entities_per_tick = global.entities_per_tick
+  local update = global.iteration == 0
+
+  -- Prepare iteration data holders
   local id = global.last_id
   local data
 
@@ -225,12 +413,10 @@ local function on_tick(e)
   else
     id, data = next(entity_data, nil)
   end
-  local update = global.iteration == 0
-  local entities_per_tick = global.entities_per_tick
 
+  -- Actually execute the update
   for i = 1, entities_per_tick do
     if id == nil then
-      global.iteration = (global.iteration + 1) % global.iterations_per_update
       break
     end
     if data.entity.valid then
@@ -240,53 +426,68 @@ local function on_tick(e)
     end
     id, data = next(entity_data, id)
   end
+
+  -- Update state for next run
+  if id == nil then
+    global.iteration = (global.iteration + 1) % global.iterations_per_update
+  end
   global.last_id = id
 end
 
-local function on_built(e)
-  local entity = e.created_entity
-  if (entity.type == "assembling-machine") or (entity.type == "furnace") or
-      (entity.type == "mining-drill") or (entity.type == "lab") then
-    add_entity(entity)
-  end
+--- Event handler for newly build entities.
+--
+-- @param event:Event - The event contain the information about the newly build entity.
+--
+local function on_built(event)
+  add_entity(event.created_entity)
 end
 
+--- Event handler for a changed configuration and mods.
+--
+-- @param event:Event - The event containing the details of the changes.
+--
 local function on_configuration_changed(event)
-  --Any MOD has been changed/added/removed, including base game updates.
+  -- Any MOD has been changed/added/removed, including base game updates.
   if event.mod_changes then
     game.print("UtilizationMonitor: Game or mod version changes detected")
     global.need_reset = true
   end
 end
 
+--- Event handler for the update settings event
+--
+-- @param event - The event with the information which setting has changed.
+--
 local function update_settings(event)
-  if event.setting == "utilization-monitor-enabled" then
-    global.show_labels = settings.global["utilization-monitor-enabled"].value
-    -- Purge old labels
-    for _, data in pairs(global.entity_data) do
-      remove_label(data)
-    end
-    -- Recreate labels
-    if global.show_labels then
-      for _, data in pairs(global.entity_data) do
-        add_label(data)
-      end
-    end
+  if event.setting == "utilization-monitor-show-labels" then
+    update_show_labels(settings.global["utilization-monitor-show-labels"].value)
+
   elseif event.setting == "utilization-monitor-entities-per-tick" then
     global.entities_per_tick = settings.global["utilization-monitor-entities-per-tick"].value
     game.print("UtilizationMonitor: entities-per-tick set to " .. global.entities_per_tick)
+
+  elseif event.setting == "utilization-monitor-iterations-per-update" then
+    global.iterations_per_update = settings.global["utilization-monitor-iterations-per-update"].value
+    game.print("UtilizationMonitor: iterations-per-update set to " .. global.iterations_per_update)
   end
 end
 
+--- Event handler for the toggle UM hotkey.
+--
+-- @param event - The event causing the toggle.
+--
 local function on_toogle_utilization_monitor(event)
-  global.show_labels = not global.show_labels -- TODO fix this
+  update_show_labels(not global.show_labels)
 end
+
+-----------------------------
+-- Register event handlers --
+-----------------------------
 
 script.on_init(on_init)
 script.on_load(on_load)
+script.on_configuration_changed(on_configuration_changed)
 script.on_event({defines.events.on_tick}, on_tick)
 script.on_event({defines.events.on_built_entity, defines.events.on_robot_built_entity}, on_built)
-
-script.on_configuration_changed(on_configuration_changed)
 script.on_event(defines.events.on_runtime_mod_setting_changed, update_settings)
 script.on_event("toggle-utilization-monitor", on_toogle_utilization_monitor)
