@@ -15,7 +15,7 @@ data:extend{
         maximum_value = 20000,
         order = "utilization-monitor-b"
     },
-	{
+    {
         type = "int-setting",
         name = "utilization-monitor-iterations-per-update",
         setting_type = "runtime-global",

@@ -46,7 +46,10 @@ UMData.sec_avg : UMAvg
 UMData.min_avg : UMAvg
 
 -- The label for the entity associated with this data entry.
-UMData.label = Entity or nil
+UMData.label : Entity or nil
+
+-- Temporary variable for storing the last progress value to determine whether there are changes since last calculation.
+UMData.last_progress : any
 
 
 
@@ -59,10 +62,10 @@ UMAvg.capacity : uint
 UMAvg.values : Array<numeric>
 
 -- The next index of the values array that should be overwritten.
-UMAvg.next_index = 1
+UMAvg.next_index : uint
 
 -- The sum of values for performance reasons.
-UMAvg.total = 0
+UMAvg.total : uint
 
 ]]
 
