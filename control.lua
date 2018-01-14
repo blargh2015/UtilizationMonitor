@@ -319,7 +319,7 @@ local function reset()
   global.iteration = 0
   global.show_labels = settings.global["utilization-monitor-show-labels"].value
   global.entities_per_tick = settings.global["utilization-monitor-entities-per-tick"].value
-  global.iterations_per_update = settings.global["utilization-monitor-entities-per-tick"].value
+  global.iterations_per_update = settings.global["utilization-monitor-iterations-per-update"].value
 
   local count = 0
   for _, surface in pairs(game.surfaces) do
