@@ -445,6 +445,10 @@ local function on_built(event)
   add_entity(event.created_entity)
 end
 
+local function on_destroyed(event)
+  remove_entity(event.entity.unit_number)
+end
+
 --- Event handler for a changed configuration and mods.
 --
 -- @param event:Event - The event containing the details of the changes.
@@ -492,5 +496,6 @@ script.on_load(on_load)
 script.on_configuration_changed(on_configuration_changed)
 script.on_event({defines.events.on_tick}, on_tick)
 script.on_event({defines.events.on_built_entity, defines.events.on_robot_built_entity}, on_built)
+script.on_event({defines.events.on_entity_died, defines.events.on_player_mined_entity, defines.events.on_robot_mined_entity}, on_destroyed)
 script.on_event(defines.events.on_runtime_mod_setting_changed, update_settings)
 script.on_event("toggle-utilization-monitor", on_toogle_utilization_monitor)
