@@ -21,3 +21,6 @@
 
 0.2.5 - 2018-01-05
 - Improve performance by about 25%
+
+0.3.0 - 2018-01-15
+- Major performance improvements, thanks to @ST-DDT for https://github.com/sullerandras/UtilizationMonitor/pull/6 and https://github.com/sullerandras/UtilizationMonitor/pull/7
