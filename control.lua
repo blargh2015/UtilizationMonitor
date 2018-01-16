@@ -288,9 +288,11 @@ end
 --
 local function remove_entity(id)
   local data = global.entity_data[id]
-  global.entity_data[id] = nil -- Prevent memory leaks
-  -- Remove label
-  remove_label(data)
+  if data then
+    global.entity_data[id] = nil -- Prevent memory leaks
+    -- Remove label
+    remove_label(data)
+  end
 end
 
 --- Hard resets all data used by UM.
