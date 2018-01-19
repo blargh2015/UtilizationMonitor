@@ -23,6 +23,9 @@ global.iteration : uint
 -- Whether to show the labels or not
 global.show_labels : boolean (configurable)
 
+-- Whether the mod is disabled or not.
+global.disabled : boolean (configurable)
+
 -- Limits the total count of entities to be processed per tick. The other entities will be processed in the next tick.
 global.entities_per_tick : uint (configurable)
 
@@ -138,6 +141,7 @@ end
 local function remove_label(data)
   if data and data.label and data.label.valid then
     data.label.destroy()
+    data.label = nil
   end
 end
 
@@ -371,11 +375,32 @@ local function update_show_labels(value)
   end
 end
 
+--- Updates the `disabled` option and executes the necessary operations (reset/remove labels).
+--
+-- @param enabled:boolean - `true` if the mod should be enabled
+--
+local function update_disabled(enabled)
+  global.disabled = not enabled
+  if global.disabled then
+    for _, data in pairs(global.entity_data) do
+      remove_label(data)
+    end
+    global.entity_data = nil
+    remove_event_handlers()
+  else
+    add_event_handlers()
+    reset()
+  end
+end
+
 ---------------------
 -- Event functions --
 ---------------------
 
 local function on_dolly_moved_entity(event)
+  if global.disabled then
+    return
+  end
   moved_entity(event.moved_entity)
 end
 
@@ -471,6 +496,9 @@ local function update_settings(event)
   if event.setting == "utilization-monitor-show-labels" then
     update_show_labels(settings.global["utilization-monitor-show-labels"].value)
 
+  elseif event.setting == "utilization-monitor-enabled" then
+    update_disabled(settings.global["utilization-monitor-enabled"].value)
+
   elseif event.setting == "utilization-monitor-entities-per-tick" then
     global.entities_per_tick = settings.global["utilization-monitor-entities-per-tick"].value
     game.print("UtilizationMonitor: entities-per-tick set to " .. global.entities_per_tick)
@@ -481,23 +509,45 @@ local function update_settings(event)
   end
 end
 
+--- Event handler for the toggle UM labels hotkey.
+--
+-- @param event - The event causing the toggle.
+--
+local function on_toogle_utilization_monitor_labels(event)
+  update_show_labels(not global.show_labels)
+end
+
 --- Event handler for the toggle UM hotkey.
 --
 -- @param event - The event causing the toggle.
 --
 local function on_toogle_utilization_monitor(event)
-  update_show_labels(not global.show_labels)
+  update_disabled(global.disabled)
 end
 
 -----------------------------
 -- Register event handlers --
 -----------------------------
 
+function add_event_handlers()
+  script.on_event({defines.events.on_tick}, on_tick)
+  script.on_event({defines.events.on_built_entity, defines.events.on_robot_built_entity}, on_built)
+  script.on_event({defines.events.on_entity_died, defines.events.on_player_mined_entity, defines.events.on_robot_mined_entity}, on_destroyed)
+  script.on_event("toggle-utilization-monitor-labels", on_toogle_utilization_monitor_labels)
+end
+
+function remove_event_handlers()
+  script.on_event({defines.events.on_tick}, nil)
+  script.on_event({defines.events.on_built_entity, defines.events.on_robot_built_entity}, nil)
+  script.on_event({defines.events.on_entity_died, defines.events.on_player_mined_entity, defines.events.on_robot_mined_entity}, nil)
+  script.on_event("toggle-utilization-monitor-labels", nil)
+end
+
 script.on_init(on_init)
 script.on_load(on_load)
 script.on_configuration_changed(on_configuration_changed)
-script.on_event({defines.events.on_tick}, on_tick)
-script.on_event({defines.events.on_built_entity, defines.events.on_robot_built_entity}, on_built)
-script.on_event({defines.events.on_entity_died, defines.events.on_player_mined_entity, defines.events.on_robot_mined_entity}, on_destroyed)
 script.on_event(defines.events.on_runtime_mod_setting_changed, update_settings)
 script.on_event("toggle-utilization-monitor", on_toogle_utilization_monitor)
+if not global.disabled then
+  add_event_handlers()
+end

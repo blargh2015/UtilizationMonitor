@@ -1,10 +1,17 @@
 data:extend{
     {
         type = "bool-setting",
-        name = "utilization-monitor-show-labels",
+        name = "utilization-monitor-enabled",
         setting_type = "runtime-global",
         default_value = true,
         order = "utilization-monitor-a"
+    },
+    {
+        type = "bool-setting",
+        name = "utilization-monitor-show-labels",
+        setting_type = "runtime-global",
+        default_value = true,
+        order = "utilization-monitor-b"
     },
     {
         type = "int-setting",
@@ -13,7 +20,7 @@ data:extend{
         default_value = 1000,
         minimum_value = 1,
         maximum_value = 20000,
-        order = "utilization-monitor-b"
+        order = "utilization-monitor-c"
     },
     {
         type = "int-setting",
@@ -22,6 +29,6 @@ data:extend{
         default_value = 60,
         minimum_value = 1,
         maximum_value = 300,
-        order = "utilization-monitor-c"
+        order = "utilization-monitor-d"
     },
 }
