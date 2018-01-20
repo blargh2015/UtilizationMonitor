@@ -145,6 +145,16 @@ local function remove_label(data)
   end
 end
 
+--- Removes all labels for the entries on the given data table.
+--
+-- @param entity_data:Table<UMData> - The table that contains all data that should be purged.
+--
+local function purge_labels(entity_data)
+  for _, data in pairs(global.entity_data) do
+    remove_label(data)
+  end
+end
+
 --------------------------
 -- Is working functions --
 --------------------------
@@ -317,9 +327,7 @@ local function reset()
   global.last_id = nil
   -- Purge old labels
   if global.entity_data ~= nil then
-    for _, data in pairs(global.entity_data) do
-      remove_label(data)
-    end
+    purge_labels(global.entity_data)
   end
   global.entity_data = {}
   global.iteration = 0
@@ -357,6 +365,22 @@ end
 -- Configuration functions --
 -----------------------------
 
+--- Updates the `disabled` option and executes the necessary operations (reset/remove labels).
+--
+-- @param enabled:boolean - `true` if the mod should be enabled
+--
+local function update_disabled(enabled)
+  global.disabled = not enabled
+  if global.disabled then
+    purge_labels(global.entity_data)
+    global.entity_data = {} -- Prevent memory leaks
+    remove_event_handlers()
+  else
+    add_event_handlers()
+    reset()
+  end
+end
+
 --- Updates the show_labels option and executes the necessary operations (remove/add labels).
 --
 -- @param value:boolean - Whether to show the labels or not.
@@ -364,9 +388,7 @@ end
 local function update_show_labels(value)
   global.show_labels = value
   -- Purge old labels
-  for _, data in pairs(global.entity_data) do
-    remove_label(data)
-  end
+  purge_labels(global.entity_data)
   -- Recreate labels
   if global.show_labels then
     for _, data in pairs(global.entity_data) do
@@ -375,32 +397,11 @@ local function update_show_labels(value)
   end
 end
 
---- Updates the `disabled` option and executes the necessary operations (reset/remove labels).
---
--- @param enabled:boolean - `true` if the mod should be enabled
---
-local function update_disabled(enabled)
-  global.disabled = not enabled
-  if global.disabled then
-    for _, data in pairs(global.entity_data) do
-      remove_label(data)
-    end
-    global.entity_data = nil
-    remove_event_handlers()
-  else
-    add_event_handlers()
-    reset()
-  end
-end
-
 ---------------------
 -- Event functions --
 ---------------------
 
 local function on_dolly_moved_entity(event)
-  if global.disabled then
-    return
-  end
   moved_entity(event.moved_entity)
 end
 
@@ -472,6 +473,10 @@ local function on_built(event)
   add_entity(event.created_entity)
 end
 
+--- Event handler for destroyed entities.
+--
+-- @param event:Event - The event contain the information about the destroyed entity.
+--
 local function on_destroyed(event)
   remove_entity(event.entity.unit_number)
 end
@@ -493,11 +498,11 @@ end
 -- @param event - The event with the information which setting has changed.
 --
 local function update_settings(event)
-  if event.setting == "utilization-monitor-show-labels" then
-    update_show_labels(settings.global["utilization-monitor-show-labels"].value)
-
-  elseif event.setting == "utilization-monitor-enabled" then
+  if event.setting == "utilization-monitor-enabled" then
     update_disabled(settings.global["utilization-monitor-enabled"].value)
+
+  elseif event.setting == "utilization-monitor-show-labels" then
+    update_show_labels(settings.global["utilization-monitor-show-labels"].value)
 
   elseif event.setting == "utilization-monitor-entities-per-tick" then
     global.entities_per_tick = settings.global["utilization-monitor-entities-per-tick"].value
@@ -509,20 +514,20 @@ local function update_settings(event)
   end
 end
 
---- Event handler for the toggle UM labels hotkey.
---
--- @param event - The event causing the toggle.
---
-local function on_toogle_utilization_monitor_labels(event)
-  update_show_labels(not global.show_labels)
-end
-
 --- Event handler for the toggle UM hotkey.
 --
 -- @param event - The event causing the toggle.
 --
 local function on_toogle_utilization_monitor(event)
   update_disabled(global.disabled)
+end
+
+--- Event handler for the toggle UM labels hotkey.
+--
+-- @param event - The event causing the toggle.
+--
+local function on_toogle_utilization_monitor_labels(event)
+  update_show_labels(not global.show_labels)
 end
 
 -----------------------------
