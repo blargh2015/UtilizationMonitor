@@ -402,7 +402,7 @@ end
 ---------------------
 
 local function on_dolly_moved_entity(event)
-  moved_entity(event.moved_entity)
+  move_entity(event.moved_entity)
 end
 
 --[[Init Events]]
