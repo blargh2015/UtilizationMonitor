@@ -441,6 +441,10 @@ local function on_tick(event)
 
   if id then
     data = entity_data[id]
+    -- Fix for #17: The next data to be processed has been removed between the ticks.
+    if data == nil then
+      id, data = next(entity_data, nil)
+    end
   else
     id, data = next(entity_data, nil)
   end
