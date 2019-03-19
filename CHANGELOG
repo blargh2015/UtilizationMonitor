@@ -33,3 +33,6 @@
 
 0.4.1 - 2018-03-30
 - Fixed rare crash caused by destroying the next entity to be scanned. Thanks to @abordoli for reporting it (#17).
+
+0.5.0 - 2019-03-19
+- Make it compatible with 0.17. Thanks @ST-DDT for the PR (#18).
