@@ -33,7 +33,6 @@ global.entities_per_tick : uint (configurable)
 global.iterations_per_update : uint (configurable)
 
 
-
 UMData:
 
 -- The entity that will by tracked by this data.
@@ -215,25 +214,48 @@ local function is_working_lab(data)
   return is_working
 end
 
---- Gets the function for calculating the working state of the given entity.
+--- Determine if we have support for this entity type.
 --
 -- @param entity:Entity - The entity for which the function should be searched.
--- @return function - The function used to calculate the working state of the entity or nil if it is unsupported.
+-- @return boolean - true if we can support (and thus should monitor), false otherwise.
 --
-local function get_is_working_function(entity)
+local function can_determine_working(entity)
   local t = entity.type
   if t == "furnace" then
-    return is_working_furnance
+    return true
   elseif t == "assembling-machine" then
-    return is_working_assembly_machine
+    return true
   elseif t == "mining-drill" then
     if entity.name == "factory-port-marker" then
       -- ignore factorissimo2 arrows on factory buildings
-      return nil
+      return false
     end
     return is_working_mining_drill
   elseif t == "lab" then
-    return is_working_lab
+    return true
+  end
+  return false
+end
+
+--- Determine whether the given entity is actually working.
+--
+-- @param data:UMData - Data associated with the object in question.
+-- @return boolean - Whether the entity is currently working or not, or nil if this wasn't a known object.
+--
+local function is_working(data)
+  local t = data.entity.type
+  if t == "furnace" then
+    return is_working_furnance(data)
+  elseif t == "assembling-machine" then
+    return is_working_assembly_machine(data)
+  elseif t == "mining-drill" then
+    if data.entity.name == "factory-port-marker" then
+      -- ignore factorissimo2 arrows on factory buildings
+      return nil
+    end
+    return is_working_mining_drill(data)
+  elseif t == "lab" then
+    return is_working_lab(data)
   end
   return nil
 end
@@ -248,7 +270,7 @@ end
 -- @param update:boolean - Whether the long term data and label should be updated.
 --
 function update_entity(data, update)
-  local is_working = (data.is_working(data) and 1 or 0)
+  local is_working = (is_working(data) and 1 or 0)
   if update then
     local sec_percent = add2(data.sec_avg, is_working)
     local min_percent = add2(data.min_avg, sec_percent)
@@ -266,12 +288,11 @@ end
 -- @return boolean - Whether the given entity was supported and tracked.
 --
 local function add_entity(entity)
-  local is_working_function = get_is_working_function(entity)
-  if is_working_function then
+  local can_determine = can_determine_working(entity)
+  if can_determine then
     local id = entity.unit_number
     local data = {
       entity = entity,
-      is_working = is_working_function,
       sec_avg = { capacity = 60, values = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, next_index = 1, total = 0},
       min_avg = { capacity = 60, values = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, next_index = 1, total = 0},
     }
