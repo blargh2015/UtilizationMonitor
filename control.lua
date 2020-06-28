@@ -579,5 +579,6 @@ script.on_configuration_changed(on_configuration_changed)
 script.on_event(defines.events.on_runtime_mod_setting_changed, update_settings)
 script.on_event("toggle-utilization-monitor", on_toogle_utilization_monitor)
 if not global.disabled then
+  commands.add_command("umreset", "Use /umreset to reset Utilization Monitor, recheck entities, and restart counting.", reset)
   add_event_handlers()
 end
