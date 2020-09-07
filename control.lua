@@ -498,6 +498,10 @@ local function on_built(event)
   add_entity(event.created_entity)
 end
 
+local function on_built_script(event)
+  add_entity(event.entity)
+end
+
 --- Event handler for destroyed entities.
 --
 -- @param event:Event - The event contain the information about the destroyed entity.
@@ -562,14 +566,15 @@ end
 function add_event_handlers()
   script.on_event({defines.events.on_tick}, on_tick)
   script.on_event({defines.events.on_built_entity, defines.events.on_robot_built_entity}, on_built)
-  script.on_event({defines.events.on_entity_died, defines.events.on_player_mined_entity, defines.events.on_robot_mined_entity}, on_destroyed)
+  script.on_event({defines.events.script_raised_built, defines.events.script_raised_revive}, on_built_script)
+  script.on_event({defines.events.on_entity_died, defines.events.on_player_mined_entity, defines.events.on_robot_mined_entity, defines.events.script_raised_destroy}, on_destroyed)
   script.on_event("toggle-utilization-monitor-labels", on_toogle_utilization_monitor_labels)
 end
 
 function remove_event_handlers()
   script.on_event({defines.events.on_tick}, nil)
-  script.on_event({defines.events.on_built_entity, defines.events.on_robot_built_entity}, nil)
-  script.on_event({defines.events.on_entity_died, defines.events.on_player_mined_entity, defines.events.on_robot_mined_entity}, nil)
+  script.on_event({defines.events.on_built_entity, defines.events.on_robot_built_entity, defines.events.script_raised_built, defines.events.script_raised_revive}, nil)
+  script.on_event({defines.events.on_entity_died, defines.events.on_player_mined_entity, defines.events.on_robot_mined_entity, defines.events.script_raised_destroy}, nil)
   script.on_event("toggle-utilization-monitor-labels", nil)
 end
 
