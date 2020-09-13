@@ -1,0 +1,33 @@
+---------------------------------------------------------------------------------------------------
+Version: 0.6.6
+Date: 2020.09.13
+  Changes:
+    - Move changelog into official format.
+---------------------------------------------------------------------------------------------------
+Version: 0.6.5
+Date: 2020.09.12
+  Changes:
+    - Add thumbnail.
+---------------------------------------------------------------------------------------------------
+Version: 0.6.4
+Date: 2020.09.07
+  Features:
+    - Update to add in monitoring of script_raised_ triggers, properly supporting Nanobots and other mods that have been updated for that.
+---------------------------------------------------------------------------------------------------
+Version: 0.6.3
+Date: 2020.06.08
+  Features:
+    - Add /umreset command to help with other mods (Nanobots, especially) that trip over event bugs preventing UM from seeing the object being placed, or any other reason someone may want to reset UM stats.
+---------------------------------------------------------------------------------------------------
+Version: 0.6.1
+Date: 2020.06.07
+  Changes:
+    - Improvement on the fix for 0.18.27.
+---------------------------------------------------------------------------------------------------
+Version: 0.6.0
+Date: 2020.06.07
+  Info:
+    - Initial import from UtilizationMonitor mod.
+  Bugfixes:
+    - Initial tweak to support 0.18.27.
+
