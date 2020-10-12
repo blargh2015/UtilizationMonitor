@@ -316,7 +316,7 @@ local function register_conditional_events()
 end
 
 local function on_init()
-  global.need_reset = true
+  reset()
   register_conditional_events()
 end
 
