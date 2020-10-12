@@ -57,9 +57,6 @@ UMData.last_progress : any
 
 UMAvg:
 
--- The length of values for performance reasons.
-UMAvg.capacity : uint
-
 -- The working states during the last n measurements.
 UMAvg.values : Array<numeric>
 
@@ -75,19 +72,6 @@ UMAvg.total : uint
 -- Utility functions --
 -----------------------
 
---- Adds the given value to the given average holder.
---
--- @param avg:UMAvg - The average holder to update.
--- @param value:numeric - The value to add to the average.
---
-local function add(avg, value)
-  local index = avg.next_index
-  local total = avg.total - avg.values[index] + value
-  avg.total = total
-  avg.values[index] = value
-  avg.next_index = index % avg.capacity + 1
-end
-
 --- Adds the given value to the given average holder and returns the current average.
 --
 -- @param avg:UMAvg - The average holder to update.
@@ -97,11 +81,10 @@ end
 local function add2(avg, value)
   local index = avg.next_index
   local total = avg.total - avg.values[index] + value
-  local capacity = avg.capacity
   avg.total = total
   avg.values[index] = value
-  avg.next_index = index % capacity + 1
-  return total / capacity
+  avg.next_index = index % 60 + 1
+  return total / 60
 end
 
 --- Calculates the label position for the given entity.
@@ -129,7 +112,7 @@ end
 --
 local function add_label(data)
   local entity = data.entity
-  local percent = data.min_avg.total / data.min_avg.capacity
+  local percent = data.min_avg.total / 60
   data.label = entity.surface.create_entity{name = "statictext", position = label_position_for(entity), text = format_label(percent)}
 end
 
@@ -152,66 +135,6 @@ local function purge_labels(entity_data)
   for _, data in pairs(global.entity_data) do
     remove_label(data)
   end
-end
-
---------------------------
--- Is working functions --
---------------------------
-
---- Calculates whether the furnace associated with the given data is currently working.
---
--- @param data:UMData - The data associated with the furnace.
--- @return boolean - Whether the furnace is currently working or not.
---
-local function is_working_furnance(data)
-  local progress = data.entity.crafting_progress
-  local is_working = (progress ~= data.last_progress)
-  data.last_progress = progress
-  return is_working
-end
-
---- Calculates whether the assembly machine associated with the given data is currently working.
---
--- @param data:UMData - The data associated with the assembly machine.
--- @return boolean - Whether the assembly machine is currently working or not.
---
-local function is_working_assembly_machine(data)
-  local progress = data.entity.crafting_progress
-  local is_working = (progress ~= data.last_progress)
-  data.last_progress = progress
-  return is_working
-end
-
---- Calculates whether the mining drill associated with the given data is currently working.
---
--- @param data:UMData - The data associated with the mining drill.
--- @return boolean - Whether the mining drill is currently working or not.
---
-local function is_working_mining_drill(data)
-  local progress = data.entity.mining_progress
-  local is_working = (progress ~= data.last_progress)
-  data.last_progress = progress
-  return is_working
-end
-
---- Calculates whether the lab associated with the given data is currently working.
---
--- @param data:UMData - The data associated with the lab.
--- @return boolean - Whether the lab is currently working or not.
---
-local function is_working_lab(data)
-  local sum_durability = 0.0
-  local inventory = data.entity.get_inventory(defines.inventory.lab_input)
-  -- Count the remaining durability of all research items
-  for i = 1, #inventory do
-    local item = inventory[i]
-    if item.valid_for_read then
-      sum_durability = sum_durability + item.durability
-    end
-  end
-  local is_working = (sum_durability ~= data.last_progress)
-  data.last_progress = sum_durability
-  return is_working
 end
 
 --- Determine if we have support for this entity type.
@@ -237,50 +160,9 @@ local function can_determine_working(entity)
   return false
 end
 
---- Determine whether the given entity is actually working.
---
--- @param data:UMData - Data associated with the object in question.
--- @return boolean - Whether the entity is currently working or not, or nil if this wasn't a known object.
---
-local function is_working(data)
-  local t = data.entity.type
-  if t == "furnace" then
-    return is_working_furnance(data)
-  elseif t == "assembling-machine" then
-    return is_working_assembly_machine(data)
-  elseif t == "mining-drill" then
-    if data.entity.name == "factory-port-marker" then
-      -- ignore factorissimo2 arrows on factory buildings
-      return nil
-    end
-    return is_working_mining_drill(data)
-  elseif t == "lab" then
-    return is_working_lab(data)
-  end
-  return nil
-end
-
 -----------------
 -- Actual code --
 -----------------
-
---- Update the data for the given entity.
---
--- @param data:UMData - The data object which contains all data that should be updated.
--- @param update:boolean - Whether the long term data and label should be updated.
---
-function update_entity(data, update)
-  local is_working = (is_working(data) and 1 or 0)
-  if update then
-    local sec_percent = add2(data.sec_avg, is_working)
-    local min_percent = add2(data.min_avg, sec_percent)
-    if data.label then
-      data.label.text = format_label(min_percent)
-    end
-  else
-    add(data.sec_avg, is_working)
-  end
-end
 
 --- Adds an entity to be tracked by UM.
 --
@@ -293,8 +175,8 @@ local function add_entity(entity)
     local id = entity.unit_number
     local data = {
       entity = entity,
-      sec_avg = { capacity = 60, values = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, next_index = 1, total = 0},
-      min_avg = { capacity = 60, values = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, next_index = 1, total = 0},
+      sec_avg = { values = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, next_index = 1, total = 0},
+      min_avg = { values = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, next_index = 1, total = 0},
     }
     if global.show_labels then
       add_label(data)
@@ -476,7 +358,19 @@ local function on_tick(event)
       break
     end
     if data.entity.valid then
-      update_entity(data, update)
+      local is_working = ((data.entity.status == defines.entity_status.working) and 1 or 0)
+      if update then
+        local sec_percent = add2(data.sec_avg, is_working)
+        local min_percent = add2(data.min_avg, sec_percent)
+        if data.label then
+          data.label.text = format_label(min_percent)
+        end
+      else
+        local index = data.sec_avg.next_index
+        data.sec_avg.total = data.sec_avg.total - data.sec_avg.values[index] + is_working
+        data.sec_avg.values[index] = is_working
+        data.sec_avg.next_index = index % 60 + 1
+      end
     else
       remove_entity(id)
     end

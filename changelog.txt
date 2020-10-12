@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.7.0
+Date: 2020.10.11
+  Changes:
+    - Refactored some code for a performance improvement - the mod measures about 18% faster on average versus 0.6.6.
+  Bugfixes:
+    - Fix for under reporting seen with extremely fast receipes.
+---------------------------------------------------------------------------------------------------
 Version: 0.6.6
 Date: 2020.09.13
   Changes:
