@@ -129,13 +129,12 @@ end
 -- @param data:UMData - The data to update.
 --
 local function update_label(data)
-  local avg = data.min_avg.total / data.min_avg.count
   if data.min_avg.is_stable then
-    data.label.text = format_label(avg)
+    data.label.text = format_label(data.min_avg.total / data.min_avg.count)
     data.label.color = global.color_steady
   else
-    if global.render_spoolup then
-        data.label.text = format_label(avg)
+    if global.render_spoolup and data.min_avg.next_index > 1 then
+        data.label.text = format_label(data.min_avg.total / (data.min_avg.next_index - 1))
         data.label.color = global.color_spoolup
     else
         data.label.text = ""
