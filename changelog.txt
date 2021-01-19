@@ -7,8 +7,6 @@ Date: 2021.01.18
     - All types can now be averaged over a configurable and individual time.  Most elements default to 60 seconds, however reactors default to 20 minutes.
     - Added /umstats command to see a little information
     - Localized in-script strings.  The German localization was inherited, and while I've tried to maintain it via translation services, they're probably horrible - suggestions and translations welcome.
-  Bugfixes:
-    - Improved handling of rate limiter - now only process as many entities as needed to get through the entire list in a second, up to that limit, as opposed to that limit every single tick.  Should improve performance greatly on smaller maps.
 ---------------------------------------------------------------------------------------------------
 Version: 0.7.2
 Date: 2020.12.27

@@ -1,6 +1,7 @@
 -- The version of the data of this mod.
 -- If this value does not match the data have to be reset.
-local VERSION = "47"
+require('__profiler__/profiler.lua')
+local VERSION = "50"
 --[[--
 UM data definition:
 
@@ -31,9 +32,6 @@ global.entity_rate_max : uint (configurable)
 
 -- Whether we have warned this session about the rate exceeding limits.
 global.max_warning : boolean
-
--- The current number of entities per ticket.  Calculated based on entity_count and the entities_per_tick limit
-global.entity_rate : uint
 
 -- Whether the mod should always compute performance percentage
 global.always_perf : boolean (configurable)
@@ -104,10 +102,7 @@ local function add2(avg, value)
   avg.total = total
   avg.values[index] = value
   avg.next_index = index % avg.count + 1
-  if avg.next_index == 1 then
-    avg.has_rolled = true
-  end
-  avg.avg = total / avg.count
+  -- avg.avg = total / avg.count
 end
 
 --- Calculates the label position for the given entity.
@@ -134,12 +129,13 @@ end
 -- @param data:UMData - The data to update.
 --
 local function update_label(data)
-  if data.min_avg.has_rolled then
-    data.label.text = format_label(data.min_avg.avg)
+  local avg = data.min_avg.total / data.min_avg.count
+  if data.min_avg.is_stable then
+    data.label.text = format_label(avg)
     data.label.color = global.color_steady
   else
     if global.render_spoolup then
-        data.label.text = format_label(data.min_avg.avg)
+        data.label.text = format_label(avg)
         data.label.color = global.color_spoolup
     else
         data.label.text = ""
@@ -211,21 +207,6 @@ end
 -- Actual code --
 -----------------
 
--- Recompute the number of entities per tick to process.  Issues a warning (once per reset)
--- if the maximum is hit.
-local function recompute_rate()
-  desired_rate = math.ceil(global.entity_count / 60)
-  if desired_rate > global.entity_rate_max then
-    global.entity_rate = global.entity_rate_max
-    if global.max_warning ~= true then
-      game.print({"utilization-monitor-limit-exceeded", global.entity_rate_max})
-      global.max_warning = true
-    end
-  else
-    global.entity_rate = desired_rate
-  end
-end
-
 --- Adds an entity to be tracked by UM.
 --
 -- @param entity:Entity - The entity to track
@@ -238,7 +219,8 @@ local function add_entity(entity)
     local data = {
       entity = entity,
       type = entity.type,
-      min_avg = { values = {}, next_index = 1, total = 0, count = settings.global["utilization-monitor-secs-" .. entity.type].value, has_rolled = false, avg = 0},
+      min_avg = { values = {}, next_index = 1, total = 0, count = settings.global["utilization-monitor-secs-" .. entity.type].value, is_stable = false},
+      sec_avg = { values = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, next_index = 1, total = 0, count = 60},      
     }
     if data.min_avg.count == 0 then  -- The counting of this type of object has been configured disable.
       return false
@@ -266,7 +248,10 @@ local function add_entity(entity)
     end
     global.entity_data[id] = data
     global.entity_count = global.entity_count + 1
-    recompute_rate()
+    if global.entity_count > global.entity_rate_max and global.max_warning ~= true then
+      game.print({"utilization-monitor-limit-exceeded", global.entity_rate_max})
+      global.max_warning = true
+    end
     if global.show_labels then
       add_label(data)
     end
@@ -296,7 +281,6 @@ local function remove_entity(id)
   if data then
     global.entity_data[id] = nil -- Prevent memory leaks
     global.entity_count = global.entity_count -1
-    recompute_rate()
     -- Remove label
     remove_label(data)
   end
@@ -375,6 +359,7 @@ local function reset()
   global.entity_rate_max = settings.global["utilization-monitor-entities-per-tick"].value
   global.always_perf = settings.global["utilization-monitor-always-perf"].value
   global.max_warning = false
+  global.do_update = false
   recompute_colors()
 
   for _, surface in pairs(game.surfaces) do
@@ -382,7 +367,7 @@ local function reset()
       add_entity(entity)
     end
   end
-  game.print({"utilization-monitor-reset", global.entity_count, global.entity_rate})
+  game.print({"utilization-monitor-reset", global.entity_count})
 end
 
 -----------------------------
@@ -462,12 +447,13 @@ local function on_tick(event)
   -- Prepare for faster access
   local next = next
   local entity_data = global.entity_data
-  local entity_rate = global.entity_rate
+  local entity_rate = global.entity_rate_max
 
   -- Prepare iteration data holders
   local id = global.last_id
   local data = nil
-
+  local cur_tick = event.tick
+  
   if id then
     data = entity_data[id]
     -- Fix for #17: The next data to be processed has been removed between the ticks.
@@ -477,6 +463,13 @@ local function on_tick(event)
   else
     id, data = next(entity_data, nil)
   end
+
+  -- We update labels once a second.
+  if cur_tick % 60 == 0 then
+    global.do_update = true
+  end  
+  
+  local du = global.do_update
   
   -- Actually execute the update
   for i = 1, entity_rate do
@@ -486,8 +479,13 @@ local function on_tick(event)
     if data.entity.valid then
       local status = data.entity.status
       local working_value = working_value_calc(data)
-      add2(data.min_avg, working_value)
-      if data.label then
+      add2(data.sec_avg, working_value)
+      if du == true then
+        add2(data.min_avg, data.sec_avg.total / 60)
+        if data.min_avg.count == data.min_avg.next_index and data.min_avg.is_stable == false then
+          data.min_avg.is_stable = true
+        end
+        -- game.print("Updating "..data.entity.unit_number.." with "..data.sec_avg.total / 60)
         update_label(data)
       end
     else
@@ -497,6 +495,10 @@ local function on_tick(event)
   end
 
   -- Update state for next run
+  if du and id == nil then
+    global.do_update = false
+  end
+    
   global.last_id = id
 end
 
@@ -533,7 +535,7 @@ end
 
 -- Print out some basic stats.
 local function stats()
-  game.print({"utilization-monitor-stats", global.entity_count, global.entity_rate})
+  game.print({"utilization-monitor-stats", global.entity_count})
 end
 
 local function recompute_secs(recomp_type)
