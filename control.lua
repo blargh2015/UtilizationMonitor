@@ -1,6 +1,6 @@
 -- The version of the data of this mod.
 -- If this value does not match the data have to be reset.
-local VERSION = "0.3.0"
+local VERSION = "47"
 --[[--
 UM data definition:
 
@@ -11,14 +11,14 @@ global:
 -- The last/currently running UMData version.
 global.version : string
 
--- The last id of the entity that was updated.
+-- The unit_number of the next entity to be updated.
 global.last_id : uint
 
--- The main data container with all tracked entity data.
+-- The main data container with all tracked entity data.  Indexed by entity.unit_number.
 global.entity_data : Table<UMData>
 
--- The current iteration for the data (required for iterations_per_update)
-global.iteration : uint
+-- The count of entries in entity_data
+global.entity_count : uint
 
 -- Whether to show the labels or not
 global.show_labels : boolean (configurable)
@@ -26,23 +26,31 @@ global.show_labels : boolean (configurable)
 -- Whether the mod is disabled or not.
 global.disabled : boolean (configurable)
 
--- Limits the total count of entities to be processed per tick. The other entities will be processed in the next tick.
-global.entities_per_tick : uint (configurable)
+-- Limits the maximum number entities to be processed per tick. The other entities will be processed in the next tick.
+global.entity_rate_max : uint (configurable)
 
--- After how many iterations the long term average and labels should be updated.
-global.iterations_per_update : uint (configurable)
+-- Whether we have warned this session about the rate exceeding limits.
+global.max_warning : boolean
 
+-- The current number of entities per ticket.  Calculated based on entity_count and the entities_per_tick limit
+global.entity_rate : uint
+
+-- Whether the mod should always compute performance percentage
+global.always_perf : boolean (configurable)
+
+-- Should spooling up numbers be rendered at all?
+global.render_spoolup : boolean
+
+-- Color for spooling up
+global.color_spoolup : table
+
+-- Color for steady
+global.color_steady : table
 
 UMData:
 
 -- The entity that will by tracked by this data.
 UMData.entity : Entity
-
--- A function that can be used to calculate whether the entity is currently working
-UMData.is_working : function(UMData):boolean
-
--- The short term average processing time.
-UMData.sec_avg : UMAvg
 
 -- The long term average processing time.
 UMData.min_avg : UMAvg
@@ -53,12 +61,24 @@ UMData.label : Entity or nil
 -- Temporary variable for storing the last progress value to determine whether there are changes since last calculation.
 UMData.last_progress : any
 
+-- Some entity types have additional fields based on our computations from the prototypes, to avoid a recalc everytime:
+-- Whether to bother looking at energy statistics for this entity to determine its working percentage.
+UMData.variable_working : boolean
+
+-- For type=="generator", we store the max_energy_production
+UMData.mep : numeric
+
+-- For type=="boiler", we store the max flow rate.
+UMData.maxflow : numeric
 
 
 UMAvg:
 
 -- The working states during the last n measurements.
 UMAvg.values : Array<numeric>
+
+-- The number of values in the array
+UMAvg.count : uint
 
 -- The next index of the values array that should be overwritten.
 UMAvg.next_index : uint
@@ -83,8 +103,11 @@ local function add2(avg, value)
   local total = avg.total - avg.values[index] + value
   avg.total = total
   avg.values[index] = value
-  avg.next_index = index % 60 + 1
-  return total / 60
+  avg.next_index = index % avg.count + 1
+  if avg.next_index == 1 then
+    avg.has_rolled = true
+  end
+  avg.avg = total / avg.count
 end
 
 --- Calculates the label position for the given entity.
@@ -106,14 +129,32 @@ local function format_label(value)
   return math.max(math.floor(value * 100), 0) .. "%"
 end
 
+--- Updates a UMData's label object.
+--
+-- @param data:UMData - The data to update.
+--
+local function update_label(data)
+  if data.min_avg.has_rolled then
+    data.label.text = format_label(data.min_avg.avg)
+    data.label.color = global.color_steady
+  else
+    if global.render_spoolup then
+        data.label.text = format_label(data.min_avg.avg)
+        data.label.color = global.color_spoolup
+    else
+        data.label.text = ""
+    end
+  end
+end
+
 --- Creates a label for the entity associated with the given data.
 --
 -- @param data:UMData - The data associated with the entity the label should be created for.
 --
 local function add_label(data)
   local entity = data.entity
-  local percent = data.min_avg.total / 60
-  data.label = entity.surface.create_entity{name = "statictext", position = label_position_for(entity), text = format_label(percent)}
+  data.label = entity.surface.create_entity{name = "statictext", position = label_position_for(entity), text=""}
+  update_label(data)
 end
 
 --- Removes the label for the entity associated with the given data if it does exist.
@@ -153,8 +194,14 @@ local function can_determine_working(entity)
       -- ignore factorissimo2 arrows on factory buildings
       return false
     end
-    return is_working_mining_drill
+    return true
   elseif t == "lab" then
+    return true
+  elseif t == "generator" then
+    return true
+  elseif t == "reactor" then
+    return true
+  elseif t == "boiler" then
     return true
   end
   return false
@@ -164,24 +211,65 @@ end
 -- Actual code --
 -----------------
 
+-- Recompute the number of entities per tick to process.  Issues a warning (once per reset)
+-- if the maximum is hit.
+local function recompute_rate()
+  desired_rate = math.ceil(global.entity_count / 60)
+  if desired_rate > global.entity_rate_max then
+    global.entity_rate = global.entity_rate_max
+    if global.max_warning ~= true then
+      game.print({"utilization-monitor-limit-exceeded", global.entity_rate_max})
+      global.max_warning = true
+    end
+  else
+    global.entity_rate = desired_rate
+  end
+end
+
 --- Adds an entity to be tracked by UM.
 --
 -- @param entity:Entity - The entity to track
 -- @return boolean - Whether the given entity was supported and tracked.
 --
 local function add_entity(entity)
-  local can_determine = can_determine_working(entity)
+  local can_determine = can_determine_working(entity)  
   if can_determine then
     local id = entity.unit_number
     local data = {
       entity = entity,
-      sec_avg = { values = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, next_index = 1, total = 0},
-      min_avg = { values = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, next_index = 1, total = 0},
+      type = entity.type,
+      min_avg = { values = {}, next_index = 1, total = 0, count = settings.global["utilization-monitor-secs-" .. entity.type].value, has_rolled = false, avg = 0},
     }
+    if data.min_avg.count == 0 then  -- The counting of this type of object has been configured disable.
+      return false
+    end
+    for i = 1, data.min_avg.count do
+      table.insert(data.min_avg.values, 0)
+    end
+    -- Store some data from the prototype locally to improve performance.
+    if entity.prototype.energy_usage ~= nil then
+      data.variable_working = true
+      data.reqenergy = entity.prototype.energy_usage * (1 + entity.consumption_bonus)
+    else
+      data.variable_working = false
+    end
+    if data.type == "generator" then
+      data.mep = data.entity.prototype.max_energy_production
+    elseif data.type == "boiler" then
+      -- This gets complex, as while we can get the current flow rate in units per tick, the maximum (expected) of that value has to be calculated from the energy values.
+      influidproto = data.entity.prototype.fluidbox_prototypes[1]
+      intemp = influidproto.filter.default_temperature        -- C
+      inheat = influidproto.filter.heat_capacity              -- J needed to raise 1 deg C
+      outtemp = data.entity.prototype.target_temperature      -- C
+      maxenergy = data.entity.prototype.max_energy_usage      -- W = J/s 
+      data.maxflow = maxenergy / ((outtemp - intemp) * inheat)
+    end
+    global.entity_data[id] = data
+    global.entity_count = global.entity_count + 1
+    recompute_rate()
     if global.show_labels then
       add_label(data)
     end
-    global.entity_data[id] = data
     return true
   end
   return false
@@ -207,15 +295,61 @@ local function remove_entity(id)
   local data = global.entity_data[id]
   if data then
     global.entity_data[id] = nil -- Prevent memory leaks
+    global.entity_count = global.entity_count -1
+    recompute_rate()
     -- Remove label
     remove_label(data)
   end
 end
 
+
+--- Returns performance of a machine, based on type and energy available or used
+---
+-- @param data:UMData - The entity we need to calculator for
+-- @return float - A number from 0.0 to 1.0 for the performance of the entity currently
+--
+local function working_value_calc(data)
+  local entstatus = data.entity.status
+  if data.type == "generator" then
+    return data.entity.energy_generated_last_tick / data.mep
+  elseif data.type == "reactor" then
+    return ((entstatus == defines.entity_status.working) and 1 or 0)
+  elseif data.type == "boiler" then
+    local fr = data.entity.fluidbox.get_flow(2)
+    local ret = fr / data.maxflow
+    --  game.print("UMDebug: boiler name "..data.entity.name..", id ".. data.entity.unit_number.." , flow " .. fr .. " over max rate " .. data.maxflow.. ", ret "..ret)
+    return ret
+  else
+    if data.variable_working == false then
+      return 1.0
+    end
+    if entstatus == defines.entity_status.working and global.always_perf == false then
+      return 1.0
+    elseif (entstatus == defines.entity_status.working and global.always_perf == true) or entstatus == defines.entity_status.low_power then
+--- Thanks to boskid and eradicator at https://forums.factorio.com/viewtopic.php?f=25&t=93820 for answering this    
+      return math.min(data.reqenergy, data.entity.energy) / data.reqenergy
+    else
+      return 0.0
+    end
+  end
+end
+
+-- Rethink our color settings if needed.
+local function recompute_colors()
+  local color_map = {White={r=1,g=1,b=1,a=1}, Black={r=0,g=0,b=0,a=1}, Red={r=1,g=0,b=0,a=1}, Green={r=0,g=1,b=0,a=1}, Blue={r=0,g=0,b=1,a=1}, Yellow={r=1,g=1,b=0,a=1}, Orange={r=1,g=0.5,b=0,a=1} }
+  if settings.global["utilization-monitor-color-spoolup"].value == "Off (do not show)" then
+    global.render_spoolup = false
+  else
+    global.render_spoolup = true
+    global.color_spoolup = color_map[settings.global["utilization-monitor-color-spoolup"].value]
+  end
+  global.color_steady = color_map[settings.global["utilization-monitor-color-steady"].value]
+end  
+
+
 --- Hard resets all data used by UM.
 --
 local function reset()
-  game.print("UtilizationMonitor: Full reset")
   -- clean up data used in earlier mod versions to make savegames smaller
   global.entities = nil
   global.entity_types = nil
@@ -224,6 +358,7 @@ local function reset()
   global.min_avg = nil
   global.last_mining_progress = nil
   global.last_lab_durability = nil
+  global.iterations_per_update = nil
   -- end cleanup
 
   global.version = VERSION
@@ -233,35 +368,21 @@ local function reset()
     purge_labels(global.entity_data)
   end
   global.entity_data = {}
+  global.entity_count = 0
+  global.entity_rate = 0
   global.iteration = 0
   global.show_labels = settings.global["utilization-monitor-show-labels"].value
-  global.entities_per_tick = settings.global["utilization-monitor-entities-per-tick"].value
-  global.iterations_per_update = settings.global["utilization-monitor-iterations-per-update"].value
+  global.entity_rate_max = settings.global["utilization-monitor-entities-per-tick"].value
+  global.always_perf = settings.global["utilization-monitor-always-perf"].value
+  global.max_warning = false
+  recompute_colors()
 
-  local count = 0
   for _, surface in pairs(game.surfaces) do
-    for _, entity in pairs(surface.find_entities_filtered{type="assembling-machine"}) do
-      if add_entity(entity) then
-        count = count + 1
-      end
-    end
-    for _, entity in pairs(surface.find_entities_filtered{type="furnace"}) do
-      if add_entity(entity) then
-        count = count + 1
-      end
-    end
-    for _, entity in pairs(surface.find_entities_filtered{type="mining-drill"}) do
-      if add_entity(entity) then
-        count = count + 1
-      end
-    end
-    for _, entity in pairs(surface.find_entities_filtered{type="lab"}) do
-      if add_entity(entity) then
-        count = count + 1
-      end
+    for _, entity in pairs(surface.find_entities_filtered{type={"assembling-machine","furnace","mining-drill","lab","boiler","generator","reactor"}}) do
+      add_entity(entity)
     end
   end
-  game.print("UtilizationMonitor: found " .. count .. " entities")
+  game.print({"utilization-monitor-reset", global.entity_count, global.entity_rate})
 end
 
 -----------------------------
@@ -277,6 +398,7 @@ local function update_disabled(enabled)
   if global.disabled then
     purge_labels(global.entity_data)
     global.entity_data = {} -- Prevent memory leaks
+    global.entity_count = 0
     remove_event_handlers()
   else
     add_event_handlers()
@@ -298,6 +420,11 @@ local function update_show_labels(value)
       add_label(data)
     end
   end
+end
+
+
+local function update_always_perf(value)
+  global.always_perf = value
 end
 
 ---------------------
@@ -326,7 +453,7 @@ end
 
 local function on_tick(event)
   -- Check state
-  if global.need_reset then
+  if global.need_reset or global.version ~= VERSION then
     global.need_reset = nil
     reset()
     return
@@ -335,12 +462,11 @@ local function on_tick(event)
   -- Prepare for faster access
   local next = next
   local entity_data = global.entity_data
-  local entities_per_tick = global.entities_per_tick
-  local update = global.iteration == 0
+  local entity_rate = global.entity_rate
 
   -- Prepare iteration data holders
   local id = global.last_id
-  local data
+  local data = nil
 
   if id then
     data = entity_data[id]
@@ -351,25 +477,18 @@ local function on_tick(event)
   else
     id, data = next(entity_data, nil)
   end
-
+  
   -- Actually execute the update
-  for i = 1, entities_per_tick do
-    if id == nil then
+  for i = 1, entity_rate do
+    if id == nil then    -- This stops the loop if we get to the end of our entities list.
       break
     end
     if data.entity.valid then
-      local is_working = ((data.entity.status == defines.entity_status.working) and 1 or 0)
-      if update then
-        local sec_percent = add2(data.sec_avg, is_working)
-        local min_percent = add2(data.min_avg, sec_percent)
-        if data.label then
-          data.label.text = format_label(min_percent)
-        end
-      else
-        local index = data.sec_avg.next_index
-        data.sec_avg.total = data.sec_avg.total - data.sec_avg.values[index] + is_working
-        data.sec_avg.values[index] = is_working
-        data.sec_avg.next_index = index % 60 + 1
+      local status = data.entity.status
+      local working_value = working_value_calc(data)
+      add2(data.min_avg, working_value)
+      if data.label then
+        update_label(data)
       end
     else
       remove_entity(id)
@@ -378,9 +497,6 @@ local function on_tick(event)
   end
 
   -- Update state for next run
-  if id == nil then
-    global.iteration = (global.iteration + 1) % global.iterations_per_update
-  end
   global.last_id = id
 end
 
@@ -411,10 +527,33 @@ end
 local function on_configuration_changed(event)
   -- Any MOD has been changed/added/removed, including base game updates.
   if event.mod_changes then
-    game.print("UtilizationMonitor: Game or mod version changes detected")
     global.need_reset = true
   end
 end
+
+-- Print out some basic stats.
+local function stats()
+  game.print({"utilization-monitor-stats", global.entity_count, global.entity_rate})
+end
+
+local function recompute_secs(recomp_type)
+  -- Rebuild just for this type.
+  to_remove = { }
+  for _, data in pairs(global.entity_data) do
+    if data.entity.type == recomp_type then
+      table.insert(to_remove, data.entity.unit_number)
+    end
+  end
+  for _, num in pairs(to_remove) do
+    remove_entity(num)
+  end
+  for _, surface in pairs(game.surfaces) do
+    for _, entity in pairs(surface.find_entities_filtered{type=recomp_type}) do
+      add_entity(entity)
+    end
+  end  
+end
+
 
 --- Event handler for the update settings event
 --
@@ -426,14 +565,23 @@ local function update_settings(event)
 
   elseif event.setting == "utilization-monitor-show-labels" then
     update_show_labels(settings.global["utilization-monitor-show-labels"].value)
+    
+  elseif event.setting == "utilization-monitor-always-perf" then
+    update_always_perf(settings.global["utilization-monitor-always-perf"].value)    
 
   elseif event.setting == "utilization-monitor-entities-per-tick" then
-    global.entities_per_tick = settings.global["utilization-monitor-entities-per-tick"].value
-    game.print("UtilizationMonitor: entities-per-tick set to " .. global.entities_per_tick)
-
-  elseif event.setting == "utilization-monitor-iterations-per-update" then
-    global.iterations_per_update = settings.global["utilization-monitor-iterations-per-update"].value
-    game.print("UtilizationMonitor: iterations-per-update set to " .. global.iterations_per_update)
+    global.entity_rate_max = settings.global["utilization-monitor-entities-per-tick"].value
+    global.max_warning = false
+    recompute_rate()
+    stats()
+  
+  elseif string.sub(event.setting,1,25) == "utilization-monitor-color" then
+    recompute_colors()
+    update_show_labels(settings.global["utilization-monitor-show-labels"].value)
+  
+  elseif string.sub(event.setting,1,24) == "utilization-monitor-secs" then
+    recompute_secs(string.sub(event.setting,26))
+    
   end
 end
 
@@ -452,7 +600,7 @@ end
 local function on_toogle_utilization_monitor_labels(event)
   update_show_labels(not global.show_labels)
 end
-
+  
 -----------------------------
 -- Register event handlers --
 -----------------------------
@@ -478,6 +626,7 @@ script.on_configuration_changed(on_configuration_changed)
 script.on_event(defines.events.on_runtime_mod_setting_changed, update_settings)
 script.on_event("toggle-utilization-monitor", on_toogle_utilization_monitor)
 if not global.disabled then
-  commands.add_command("umreset", "Use /umreset to reset Utilization Monitor, recheck entities, and restart counting.", reset)
+  commands.add_command("umreset", {"utilization-monitor-help-reset"}, reset)
+  commands.add_command("umstats", {"utilization-monitor-help-stats"}, stats)
   add_event_handlers()
 end
