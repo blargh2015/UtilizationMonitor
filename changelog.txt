@@ -1,4 +1,29 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.8.4
+Date: 2021.01.30
+  Bugfixes:
+    - Handle entity cloning correctly.
+    - Fix issue where changing efficiency modules would result in incorrect numbers being shown in low power situations.
+    - Fix initial numbers before stable were somewhat low.
+---------------------------------------------------------------------------------------------------
+Version: 0.8.3
+Date: 2021.01.29
+  Bugfixes:
+    - Fix sometimes not updating text on very high counts of devices.
+    - Change internal name of text type 'statictext' - this may help with the issues with text not appearing correctly that has been reported (suspecting overlap with some other mod).
+---------------------------------------------------------------------------------------------------
+Version: 0.8.2
+Date: 2021.01.23
+  Bugfixes:
+    - Fix crash on changing maximum updates per tick (reported by rumpuslabs)
+---------------------------------------------------------------------------------------------------
+Version: 0.8.1
+Date: 2021.01.19
+  Bugfixes:
+    - Fix crash on using Control-U to toggle label state (reported by AngrySlipper - thanks!)
+    - Remove developer profiler dependency (reported by AngrySlipper - thanks again!)
+    - Fix changing label colors reset labels to configured label state, instead of operational label state (i.e. if labels had been turned off by keyboard shortcut)
+---------------------------------------------------------------------------------------------------
 Version: 0.8.0
 Date: 2021.01.18
   Features:
@@ -56,4 +81,3 @@ Date: 2020.06.07
     - Initial import from UtilizationMonitor mod.
   Bugfixes:
     - Initial tweak to support 0.18.27.
-
