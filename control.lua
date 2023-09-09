@@ -581,6 +581,8 @@ local function on_tick(event)
   local next = next
   local entity_data = global.entity_data
   local entity_rate = global.entity_rate_max
+  local entity_count = table_size(entity_data)
+  local entity_rate_max = global.entity_rate_max
 
   -- Prepare iteration data holders
   local id = global.last_id
@@ -598,10 +600,17 @@ local function on_tick(event)
   end
 
   -- We update labels once a second. 
-  if cur_tick % 60 == 0 then
-    global.update_marker = table_size(global.entity_data)
+  if cur_tick % 60 == 0 and global.update_marker == 0 then
+    global.update_marker = entity_count
   end  
   local gum = global.update_marker
+
+  -- Calculate percentage of entities that we can update per tick
+  local sec_multiplier = 1
+  if entity_count > entity_rate_max then
+    sec_multiplier = entity_rate_max / entity_count
+  end
+  local sec_value_count = math.ceil(60 * sec_multiplier)
 
   -- Actually execute the update
   for i = 1, entity_rate do
@@ -610,11 +619,33 @@ local function on_tick(event)
     end
     if data.entity.valid then
       local status = data.entity.status
+
+      -- As the number of entities grows, we may not be able to calculate
+      -- all entities in a single tick. When this happens, the sec_avg starts
+      -- averaging over more than a second, causing min_avg to take longer
+      -- to update. To prevent this, we change the number of values
+      -- in sec_avg so that it's closer to one second being averaged.
+      if not data.sec_avg.count == sec_value_count then
+        local next_index = data.sec_avg.next_index
+        if next_index > sec_value_count then
+          next_index = 1
+        end
+        local sec_avg = { values = {}, next_index = next_index, total = 0, count = sec_value_count, is_stable = false}
+        for i = 1, sec_value_count do
+          table.insert(sec_avg.values, 0)
+          -- We may not be taking the latest N values here, but
+          -- it's only one second so it shouldn't matter too much.
+          add2(sec_avg, data.sec_avg.values[i])
+        end
+        data.sec_avg = sec_avg
+        global.entity_data[id] = data
+      end
+
       local working_value = working_value_calc(data)
       add2(data.sec_avg, working_value)    
       if gum > 0 then     
         if data.sec_avg.is_stable then
-          add2(data.min_avg, data.sec_avg.total / 60)
+          add2(data.min_avg, data.sec_avg.total / data.sec_avg.count)
         else
           add2(data.min_avg, data.sec_avg.total / (data.sec_avg.next_index - 1))
         end 
