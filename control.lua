@@ -600,7 +600,7 @@ local function on_tick(event)
   end
 
   -- We update labels once a second. 
-  if cur_tick % 60 == 0 then
+  if cur_tick % 60 == 0 and global.update_marker == 0 then
     global.update_marker = entity_count
   end  
   local gum = global.update_marker
