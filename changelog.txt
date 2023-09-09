@@ -1,4 +1,78 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.8.15
+Date: 2023.05.13
+  Bugfixes:
+    - Fix for crash with reactor types and energy calculations (fixing Nullius thermal entities as well). Thanks OhChirpy for the report.
+  Changes:
+    - Leaving the /umdebug command in on release versions - the data output will be helpful for troubleshooting problems like the above.
+---------------------------------------------------------------------------------------------------
+Version: 0.8.14
+Date: 2022.06.09
+  Bugfixes:
+    - Drills that use fluid report correctly again (thanks tntmasta for the report)
+    - Fix entities sometimes showing -0%.
+---------------------------------------------------------------------------------------------------
+Version: 0.8.13
+Date: 2022.05.06
+  Changes:
+    - Improved the formulas used for offshore pumps to report their usage more accurately in corner cases.
+    - Added tracking support for pumps.
+    - Changed the math for percentages to round() instead of floor() (fixes some machines showing 99% instead of 100% due to division rounding errors that occur).
+---------------------------------------------------------------------------------------------------
+Version: 0.8.12
+Date: 2022.05.06
+  Bugfixes:
+    - Pumpjacks now report usage correctly (thanks tntmasta for the report)
+    - Non-square entities now have labels posititoned correctly (all labels are relative to the entity's selection box)
+    - Fixed "Only track the 'player' force" checkbox not actually working when disabled (thanks tntmasta for the report).
+    - Fixed commands /umreset and /umstats never being available if game is started with mod deactivated.
+  Features:
+    - Add tracking support for offshore pumps.
+---------------------------------------------------------------------------------------------------
+Version: 0.8.11
+Date: 2021.12.10
+  Bugfixes:
+    - Remove some debug logging accidentally left in 0.8.10.
+---------------------------------------------------------------------------------------------------
+Version: 0.8.10
+Date: 2021.12.10
+  Features:
+    - Can now select what corner of buildings for the percentages to be shown at (thanks to BloodyRain2k for this suggestion and the next 2)
+    - Can now select if the percentages only show in Alt-mode or not.
+    - Can now filter the mod to only track buildings in the 'player' force.
+---------------------------------------------------------------------------------------------------
+Version: 0.8.9
+Date: 2021.09.25
+  Bugfixes:
+    - Fix move_entity issue bug (thanks to BlueTemplar for reporting)
+---------------------------------------------------------------------------------------------------
+Version: 0.8.8
+Date: 2021.09.04
+  Bugfixes:
+    - Clean up the on_clone trigger function, and hopefully fix an issue with Space Exploration rockets.
+  Changes:
+    - Replaced some code with flib versions (but adds a dependency on flib)
+---------------------------------------------------------------------------------------------------
+Version: 0.8.7
+Date: 2021.08.07
+  Bugfixes:
+    - Fixed a crash when an object is placed with /editor.
+    - Percentages now only show for players on the same force as the entity.
+  Features:
+    - Showing labels is now a per-player setting.
+---------------------------------------------------------------------------------------------------
+Version: 0.8.6
+Date: 2021.03.09
+  Changes:
+    - Add support for PickerDollies mod (reported by AngrySlipper)
+  Bugfixes:
+    - Fix crash when other mods add boilers that have no fluid filter (reported by 8lack_snake and AngrySlipper - thanks!)
+---------------------------------------------------------------------------------------------------
+Version: 0.8.5
+Date: 2021.01.30
+  Bugfixes:
+    - (Re-)fix handling of script-triggered create events.
+---------------------------------------------------------------------------------------------------
 Version: 0.8.4
 Date: 2021.01.30
   Bugfixes:

@@ -16,9 +16,9 @@ data:extend{
     {
         type = "bool-setting",
         name = "utilization-monitor-show-labels",
-        setting_type = "runtime-global",
+        setting_type = "runtime-per-user",
         default_value = true,
-        order = "utilization-monitor-d"
+        order = "utilization-monitor-c"
     },
     {
         type = "int-setting",
@@ -36,7 +36,7 @@ data:extend{
         default_value = 60,
         minimum_value = 0,
         maximum_value = 3600,
-        order = "utilization-monitor-s1"
+        order = "utilization-monitor-s01"
     },
     {
         type = "int-setting",
@@ -45,7 +45,7 @@ data:extend{
         default_value = 60,
         minimum_value = 0,
         maximum_value = 3600,
-        order = "utilization-monitor-s2"
+        order = "utilization-monitor-s02"
     },
     {
         type = "int-setting",
@@ -54,7 +54,7 @@ data:extend{
         default_value = 60,
         minimum_value = 0,
         maximum_value = 3600,
-        order = "utilization-monitor-s3"
+        order = "utilization-monitor-s03"
     },
     {
         type = "int-setting",
@@ -63,7 +63,7 @@ data:extend{
         default_value = 60,
         minimum_value = 0,
         maximum_value = 3600,
-        order = "utilization-monitor-s4"
+        order = "utilization-monitor-s04"
     },
     {
         type = "int-setting",
@@ -72,7 +72,7 @@ data:extend{
         default_value = 60,
         minimum_value = 0,
         maximum_value = 3600,
-        order = "utilization-monitor-s5"
+        order = "utilization-monitor-s05"
     },
     {
         type = "int-setting",
@@ -81,7 +81,7 @@ data:extend{
         default_value = 60,
         minimum_value = 0,
         maximum_value = 3600,
-        order = "utilization-monitor-s6"
+        order = "utilization-monitor-s06"
     },
     {
         type = "int-setting",
@@ -90,15 +90,33 @@ data:extend{
         default_value = 1200,
         minimum_value = 0,
         maximum_value = 3600,
-        order = "utilization-monitor-s7"
+        order = "utilization-monitor-s07"
     },
+    {
+        type = "int-setting",
+        name = "utilization-monitor-secs-pump",
+        setting_type = "runtime-global",
+        default_value = 60,
+        minimum_value = 0,
+        maximum_value = 3600,
+        order = "utilization-monitor-s08"
+    },            
+    {
+        type = "int-setting",
+        name = "utilization-monitor-secs-offshore-pump",
+        setting_type = "runtime-global",
+        default_value = 60,
+        minimum_value = 0,
+        maximum_value = 3600,
+        order = "utilization-monitor-s09"
+    },    
     {
         type = "string-setting",
         name = "utilization-monitor-color-spoolup",
         setting_type = "runtime-global",
         default_value = "Orange",
         allowed_values =  { "Off (do not show)", "White", "Black", "Red", "Green", "Blue", "Yellow", "Orange" },
-        order = "utilization-monitor-t1"
+        order = "utilization-monitor-t"
     },
     {
         type = "string-setting",
@@ -106,6 +124,28 @@ data:extend{
         setting_type = "runtime-global",
         default_value = "White",
         allowed_values =  { "White", "Black", "Red", "Green", "Blue", "Yellow", "Orange" },
-        order = "utilization-monitor-t1"
-    },      
+        order = "utilization-monitor-u"
+    },
+    {
+        type = "string-setting",
+        name = "utilization-monitor-label-pos",
+        setting_type = "runtime-global",
+        default_value = "Upper Left",
+        allowed_values =  { "Upper Left", "Upper Center", "Upper Right", "Middle Left", "Middle Center", "Middle Right", "Bottom Left", "Bottom Center", "Bottom Right" },
+        order = "utilization-monitor-v"
+    },
+    {
+        type = "bool-setting",
+        name = "utilization-monitor-label-alt",
+        setting_type = "runtime-global",
+        default_value = false,
+        order = "utilization-monitor-w"
+    },
+    {
+        type = "bool-setting",
+        name = "utilization-monitor-force-player",
+        setting_type = "runtime-global",
+        default_value = true,        
+        order = "utilization-monitor-x"
+    },	
 }

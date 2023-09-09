@@ -1,10 +1,11 @@
 {
     "name": "UtilizationMonitorBlargh",
-    "version": "0.8.4",
+    "version": "0.8.15",
     "title": "Utilization Monitor (Blargh)",
     "author": "Blargh2015",
     "contact": "blargh2015@gmail.com",
     "homepage": "",
     "factorio_version": "1.1",
+	"dependencies":[ "flib" ],
     "description": "Displays utilization of factories, miners, labs and furnaces.  Based on the UtilizationMonitor by AndrasSuller, with post 0.18.27 patches and some updates."
 }
