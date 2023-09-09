@@ -113,6 +113,9 @@ end
 -- @param data:UMData - The data to update.
 --
 local function update_label(data)
+  if data.label == nil then
+    return
+  end
   if data.min_avg.is_stable then
     rendering.set_color(data.label, global.color_steady)
     rendering.set_text(data.label, format_label(data.min_avg.total / data.min_avg.count))
@@ -419,6 +422,23 @@ local function update_show_labels()
       table.insert(new_pwl, id)
     end
   end
+  
+  global.players_with_labels = new_pwl
+
+  if table_size(new_pwl) == 0 then
+    -- No players want labels, so remove them all.
+    for _, data in pairs(global.entity_data) do
+      remove_label(data)
+    end
+    return
+  else
+    -- Some players want labels, so add them all.
+    for _, data in pairs(global.entity_data) do
+      if data.label == nil then
+        add_label(data)
+      end
+    end
+  end
 
   -- Update label visibility, alt status, and position
   for _, data in pairs(global.entity_data) do  
@@ -426,8 +446,6 @@ local function update_show_labels()
     rendering.set_only_in_alt_mode(data.label, settings.global["utilization-monitor-label-alt"].value)
     set_label_offset(data.label, data.entity)	
   end
-
-  global.players_with_labels = new_pwl
 end
 
 --- Hard resets all data used by UM.
@@ -737,6 +755,7 @@ end
 --
 local function on_toogle_utilization_monitor_labels(event)
   game.players[event.player_index].mod_settings["utilization-monitor-show-labels"] = {value=not game.players[event.player_index].mod_settings["utilization-monitor-show-labels"].value}
+  update_show_labels()
 end
 
 -----------------------------
