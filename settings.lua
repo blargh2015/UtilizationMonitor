@@ -125,7 +125,7 @@ data:extend{
         default_value = "White",
         allowed_values =  { "White", "Black", "Red", "Green", "Blue", "Yellow", "Orange" },
         order = "utilization-monitor-u"
-    },
+    },       
     {
         type = "string-setting",
         name = "utilization-monitor-label-pos",
@@ -148,4 +148,13 @@ data:extend{
         default_value = true,        
         order = "utilization-monitor-x"
     },	
+    {
+        type = "double-setting",
+        name = "utilization-monitor-label-size",
+        setting_type = "runtime-global",
+        default_value = 1.0,
+        minimum_value = 0.1,
+        maximum_value = 10.0,
+        order = "utilization-monitor-y"
+    },     
 }

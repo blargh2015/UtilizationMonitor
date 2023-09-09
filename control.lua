@@ -1,6 +1,6 @@
 -- The version of the data of this mod.
 -- If this value does not match the data have to be reset.
-local VERSION = "62"
+local VERSION = "63"
 --[[--
 UM data definition:
 
@@ -113,6 +113,10 @@ end
 -- @param data:UMData - The data to update.
 --
 local function update_label(data)
+  -- Data label could be nil if we've hidden and disabled labels.
+  if data.label == nil then
+    return
+  end
   if data.min_avg.is_stable then
     rendering.set_color(data.label, global.color_steady)
     rendering.set_text(data.label, format_label(data.min_avg.total / data.min_avg.count))
@@ -179,14 +183,26 @@ local function set_label_offset(label, entity)
 end
 
 
---- Creates a label for the entity associated with the given data.
+--- Creates a label for the entity associated with the given data. Handles if no labels should be shown,
+--- and if called with or without an existing label.
 --
 -- @param data:UMData - The data associated with the entity the label should be created for.
 --
 local function add_label(data)
+  if #global.players_with_labels== 0 then
+    return
+  end
   local entity = data.entity
-  data.label = rendering.draw_text{text = "", surface = entity.surface, target = entity, force = entity.force, color = global.color_spoolup, players = global.players_with_labels, only_in_alt_mode=settings.global["utilization-monitor-label-alt"].value}
-  set_label_offset(data.label, entity)
+  if data.label == nil then
+   data.label = rendering.draw_text{text = "", surface = entity.surface, target = entity, force = entity.force, color = global.color_spoolup, players = global.players_with_labels, only_in_alt_mode=settings.global["utilization-monitor-label-alt"].value,scale=settings.global["utilization-monitor-label-size"].value}
+  else
+    -- Ensure label is set up correctly, as per current settings
+    rendering.set_players(data.label, global.players_with_labels)
+    rendering.set_only_in_alt_mode(data.label, settings.global["utilization-monitor-label-alt"].value)
+    rendering.set_scale(data.label, settings.global["utilization-monitor-label-size"].value)
+  end
+  set_label_offset(data.label, data.entity)
+  
   -- This function can get called on already-running data if Ctrl-U is tapped, but update_label only changes the color on state change from spoolup to steady.   Make sure the color is right here.
   if data.min_avg.is_stable then
     rendering.set_color(data.label, global.color_steady)
@@ -409,7 +425,7 @@ local function recompute_colors()
 end  
 
 
--- Recalculates show labels and updates text appropriately.
+-- Recalculates all labels and updates text appropriately.
 local function update_show_labels()
   -- Determine new player show array
   new_pwl = {}
@@ -420,14 +436,18 @@ local function update_show_labels()
     end
   end
 
-  -- Update label visibility, alt status, and position
-  for _, data in pairs(global.entity_data) do  
-    rendering.set_players(data.label, new_pwl)
-    rendering.set_only_in_alt_mode(data.label, settings.global["utilization-monitor-label-alt"].value)
-    set_label_offset(data.label, data.entity)	
-  end
-
   global.players_with_labels = new_pwl
+  -- If no players are left having labels visible, delete them all together and disable.
+  if #new_pwl == 0 then
+    for _, data in pairs(global.entity_data) do 
+      remove_label(data)
+    end
+  else  
+	  -- Reset the label entirely. add_label will recreate if needed, and apply all settings.
+	  for _, data in pairs(global.entity_data) do  
+      add_label(data)
+	  end
+  end
 end
 
 --- Hard resets all data used by UM.
@@ -697,7 +717,7 @@ local function update_settings(event)
   if event.setting == "utilization-monitor-enabled" then
     update_enabled(settings.global["utilization-monitor-enabled"].value)
 
-  elseif event.setting == "utilization-monitor-show-labels" or event.setting == "utilization-monitor-label-alt" or event.setting == "utilization-monitor-label-pos"  then
+  elseif event.setting == "utilization-monitor-show-labels" or event.setting == "utilization-monitor-label-alt" or event.setting == "utilization-monitor-label-pos" or event.setting == "utilization-monitor-label-size" then
     update_show_labels()
 
   elseif event.setting == "utilization-monitor-always-perf" then
@@ -720,6 +740,7 @@ local function update_settings(event)
 
   elseif event.setting == "utilization-monitor-force-player" then
     reset()
+    
   end
 end
 
@@ -735,7 +756,7 @@ end
 --
 -- @param event - The event causing the toggle.
 --
-local function on_toogle_utilization_monitor_labels(event)
+local function on_toggle_utilization_monitor_labels(event)
   game.players[event.player_index].mod_settings["utilization-monitor-show-labels"] = {value=not game.players[event.player_index].mod_settings["utilization-monitor-show-labels"].value}
 end
 
@@ -756,7 +777,7 @@ function add_event_handlers()
   script.on_event(defines.events.on_robot_mined_entity, on_destroyed, event_filters)
   script.on_event(defines.events.script_raised_destroy, on_destroyed, event_filters)
   script.on_event(defines.events.on_entity_cloned, on_cloned, event_filters)
-  script.on_event("toggle-utilization-monitor-labels", on_toogle_utilization_monitor_labels)
+  script.on_event("toggle-utilization-monitor-labels", on_toggle_utilization_monitor_labels)
   commands.add_command("umreset", {"utilization-monitor-help-reset"}, reset)
   commands.add_command("umstats", {"utilization-monitor-help-stats"}, stats)
   commands.add_command("umdebug", {"utilization-monitor-debuginfo"}, debuginfo)

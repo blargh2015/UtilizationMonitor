@@ -1,4 +1,13 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.8.16
+Date: 2023.09.09
+  Bugfixes:
+    - Toggle Labels fix for times when there's only one player. Thanks Geostyx for the report.
+  Features:
+    - The size of the labels is now adjustable in map settings. Thanks AngrySlipper for the suggestion.
+  Changes:
+    - Update locale to mention you may need to toggle labels back on as part of the reset message (that setting has been broken for a few versions, so people may have it turned off and not realize it).
+---------------------------------------------------------------------------------------------------
 Version: 0.8.15
 Date: 2023.05.13
   Bugfixes:
