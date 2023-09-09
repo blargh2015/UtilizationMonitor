@@ -798,6 +798,7 @@ script.on_init(on_init)
 script.on_load(on_load)
 script.on_configuration_changed(on_configuration_changed)
 script.on_event(defines.events.on_runtime_mod_setting_changed, update_settings)
+script.on_event(defines.events.on_player_created, update_show_labels)
 script.on_event("toggle-utilization-monitor", on_toggle_utilization_monitor)
 if settings.global["utilization-monitor-enabled"].value then
   add_event_handlers()

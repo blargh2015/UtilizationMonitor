@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.8.17
+Date: 2023.09.09
+  Bugfixes:
+    - Fix issue where label state could be wrong on new player connecting a MP game or starting a new SP game.
+---------------------------------------------------------------------------------------------------
 Version: 0.8.16
 Date: 2023.09.09
   Bugfixes:
