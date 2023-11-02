@@ -77,7 +77,6 @@ UMAvg.total : uint
 -----------------------
 -- Utility functions --
 -----------------------
-
 local table = require("__flib__.table")
 local math = require("__flib__.math")
 
@@ -182,7 +181,6 @@ local function set_label_offset(label, entity)
   rendering.set_vertical_alignment(label, va)
 end
 
-
 --- Creates a label for the entity associated with the given data. Handles if no labels should be shown,
 --- and if called with or without an existing label.
 --
@@ -264,6 +262,59 @@ local function can_determine_working(entity)
   return false
 end
 
+--- Event handler for the toggle UM hotkey.
+--
+-- @param event - The event causing the toggle.
+--
+local function on_toggle_utilization_monitor(event)
+  settings.global["utilization-monitor-enabled"] = {value=not settings.global["utilization-monitor-enabled"].value}
+end
+
+--- Event handler for the toggle UM labels hotkey.
+--
+-- @param event - The event causing the toggle.
+--
+local function on_toggle_utilization_monitor_labels(event)
+  game.players[event.player_index].mod_settings["utilization-monitor-show-labels"] = {value=not game.players[event.player_index].mod_settings["utilization-monitor-show-labels"].value}
+end
+
+-----------------------------
+--           GUI           --
+-----------------------------
+
+local mod_gui = require('mod-gui')
+local get_mod_button_flow = mod_gui.get_button_flow
+local mod_button_style = mod_gui.button_style
+
+local function update_toggle_button_state(toggle_button, new_state)
+  if new_state then
+      toggle_button.style = 'utilization_monitor_pressed_button'
+  else
+      toggle_button.style = mod_button_style
+  end
+end
+
+local function init_toggle_button(player)
+  local top_gui = get_mod_button_flow(player)
+  local toggle_element = top_gui['utilization-monitor-toggle']
+  if not toggle_element then
+      toggle_element = top_gui.add{
+          type = 'sprite-button',
+          name = 'utilization-monitor-toggle',
+          tooltip = {'utilization-monitor-toggle-button-tooltip'},
+          sprite = 'utilization-monitor-button'
+      }
+  end
+  toggle_element.visible = settings.global["utilization-monitor-enabled"].value
+  update_toggle_button_state(toggle_element, player.mod_settings['utilization-monitor-show-labels'].value)
+end
+
+local function on_gui_clicked(event)
+  if event.element and event.element.name == 'utilization-monitor-toggle' then
+    on_toggle_utilization_monitor_labels(event)
+  end
+end
+
 -----------------
 -- Actual code --
 -----------------
@@ -334,7 +385,6 @@ local function remove_entity(id)
     remove_label(data)
   end
 end
-
 
 --- Returns performance of a machine, based on type and energy available or used
 ---
@@ -424,7 +474,6 @@ local function recompute_colors()
   global.color_steady = color_map[settings.global["utilization-monitor-color-steady"].value]
 end  
 
-
 -- Recalculates all labels and updates text appropriately.
 local function update_show_labels()
   -- Determine new player show array
@@ -494,7 +543,6 @@ local function reset()
   game.print({"utilization-monitor-reset", table_size(global.entity_data)})
 end
 
-
 --- Shows internal information about an entity. Handy for debugging modded entities.
 ---
 local function debugprinted(field, val)
@@ -543,8 +591,8 @@ end
 
 --- Re-evaluates enabled state and executes the necessary operations (reset/remove labels).
 --
-local function update_enabled()
-  if not settings.global["utilization-monitor-enabled"].value then
+local function update_enabled(is_enabled)
+  if not is_enabled then
     purge_labels(global.entity_data)
     global.entity_data = {} -- Prevent memory leaks
     remove_event_handlers()
@@ -563,6 +611,9 @@ end
 ---------------------
 
 local function on_init()
+  for _, player in pairs(game.players) do
+    init_toggle_button(player)
+  end
   reset()
 end
 
@@ -683,6 +734,8 @@ local function on_configuration_changed(event)
   if event.mod_changes then
     global.need_reset = true
   end
+
+
 end
 
 -- Print out some basic stats.
@@ -708,16 +761,33 @@ local function recompute_secs(recomp_type)
   end  
 end
 
-
 --- Event handler for the update settings event
 --
 -- @param event - The event with the information which setting has changed.
 --
 local function update_settings(event)
   if event.setting == "utilization-monitor-enabled" then
-    update_enabled(settings.global["utilization-monitor-enabled"].value)
+    local new_state = settings.global[event.setting].value
+    update_enabled(new_state)
+
+    local button = get_mod_button_flow(game.get_player(event.player_index))['utilization-monitor-toggle']
+    if button then
+        button.visible = new_state
+    else
+        init_toggle_button(game.get_player(event.player_index))
+    end
 
   elseif event.setting == "utilization-monitor-show-labels" or event.setting == "utilization-monitor-label-alt" or event.setting == "utilization-monitor-label-pos" or event.setting == "utilization-monitor-label-size" then
+    if event.setting == 'utilization-monitor-show-labels' then
+        local new_state = settings.get_player_settings(event.player_index)[event.setting].value
+
+        local button = get_mod_button_flow(game.get_player(event.player_index))['utilization-monitor-toggle']
+        if button then
+            update_toggle_button_state(button, new_state)
+        else
+            init_toggle_button(game.get_player(event.player_index))
+        end
+    end
     update_show_labels()
 
   elseif event.setting == "utilization-monitor-always-perf" then
@@ -742,22 +812,6 @@ local function update_settings(event)
     reset()
     
   end
-end
-
---- Event handler for the toggle UM hotkey.
---
--- @param event - The event causing the toggle.
---
-local function on_toggle_utilization_monitor(event)
-  settings.global["utilization-monitor-enabled"] = {value=not settings.global["utilization-monitor-enabled"].value}
-end
-
---- Event handler for the toggle UM labels hotkey.
---
--- @param event - The event causing the toggle.
---
-local function on_toggle_utilization_monitor_labels(event)
-  game.players[event.player_index].mod_settings["utilization-monitor-show-labels"] = {value=not game.players[event.player_index].mod_settings["utilization-monitor-show-labels"].value}
 end
 
 -----------------------------
@@ -797,6 +851,7 @@ end
 script.on_init(on_init)
 script.on_load(on_load)
 script.on_configuration_changed(on_configuration_changed)
+script.on_event(defines.events.on_gui_click, on_gui_clicked)
 script.on_event(defines.events.on_runtime_mod_setting_changed, update_settings)
 script.on_event(defines.events.on_player_created, update_show_labels)
 script.on_event("toggle-utilization-monitor", on_toggle_utilization_monitor)
