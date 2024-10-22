@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.9.0
+Date: 2024.10.12
+  Features:
+    - Update for Factorio Space Age. Heat exchangers have lost support for the moment due to the removal of a key API function (get_flow) and no alternative for heat exchangers immediately obvious. Hopefully will fix soon.
+---------------------------------------------------------------------------------------------------
 Version: 0.8.17
 Date: 2023.09.09
   Bugfixes:
