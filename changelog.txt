@@ -1,4 +1,12 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.9.1
+Date: 2024.10.24
+  Bugfixes:
+    - Fix boilers without fuel showing 100% usage.
+    - Fix pumps at 100% usage into empty pipes sometimes showing less than 100%.
+  Info:
+    - Heat exchangers are still disabled, and pumps are showing incorrect values when they are constrained by pipes. Both of these are due to the removal of get_flow(). See https://forums.factorio.com/viewtopic.php?f=25&t=116418. Let me know in this's mod's Discussion tab if you have ideas for workaround for this. Will keep working on it.
+---------------------------------------------------------------------------------------------------
 Version: 0.9.0
 Date: 2024.10.12
   Features:

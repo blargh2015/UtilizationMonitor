@@ -1,6 +1,6 @@
 -- The version of the data of this mod.
 -- If this value does not match the data have to be reset.
-local VERSION = "65"
+local VERSION = "66"
 --[[--
 UM data definition:
 
@@ -298,15 +298,15 @@ local function add_entity(entity)
         data.mep = data.entity.prototype.get_max_energy_production(entity.quality)
       elseif data.type == "boiler" then
         -- This gets complex, as while we can get the current flow rate in units per tick, the maximum (expected) of that value has to be calculated from the energy values.
-        influidproto = data.entity.prototype.fluidbox_prototypes[1]
+        local influidproto = data.entity.prototype.fluidbox_prototypes[1]
         -- Apparently some mods add in boilers that don't have a specific fluid they take in.  Check for it, and we'll mark this object untrackable for now.
         if influidproto.filter == nil then
           return false
         end
-        intemp = influidproto.filter.default_temperature        -- C
-        inheat = influidproto.filter.heat_capacity              -- J needed to raise 1 deg C
-        outtemp = data.entity.prototype.target_temperature      -- C
-        maxenergy = data.entity.prototype.get_max_energy_usage(entity.quality)      -- W = J/s 
+        local intemp = influidproto.filter.default_temperature        -- C
+        local inheat = influidproto.filter.heat_capacity              -- J needed to raise 1 deg C
+        local outtemp = data.entity.prototype.target_temperature      -- C
+        local maxenergy = data.entity.prototype.get_max_energy_usage(entity.quality)      -- W = J/s 
         data.maxflow = maxenergy / ((outtemp - intemp) * inheat)
       end
       
@@ -353,18 +353,24 @@ end
 local function working_value_calc(data)
   if data.type == "generator" then
     return data.entity.energy_generated_last_tick / data.mep
-  elseif data.type == "pump" or data.type == "offshore-pump" then
+  elseif data.type == "offshore-pump" or data.type == "pump" then
     local fbc = data.entity.fluidbox.get_capacity(1)
-    local fb = data.entity.fluidbox[1]
+    local fb = data.entity.fluidbox[1]   -- this is nil if it's completely empty.
     local fa = fbc
     if fb ~= nil then
       fa = fb.amount
+    else
+      fa = 0
     end
     return math.min(1.0, (fbc - fa) / data.entity.prototype.pumping_speed) * calc_energy_ratio(data.entity)
   elseif data.type == "boiler" then
-    -- If this is a burner, measure it by its heat
-    if data.entity.burner ~= nil then 
-      return 1 - (data.entity.burner.heat / data.entity.burner.heat_capacity)
+    -- If this is a burner and is operational, measure it by its heat
+    if data.entity.burner ~= nil then
+      if data.entity.status ~= defines.entity_status.working then
+        return 0.0
+      else
+        return 1 - (data.entity.burner.heat / data.entity.burner.heat_capacity)
+      end
     else
       return 1.0  -- TODO: for now - this is where heat exchanger code needs to go in the future.
     end
@@ -482,7 +488,7 @@ local function debugprint(entity)
       game.print({"utilization-monitor-debuginfo-ed", "prototype.pumping_speed", entity.prototype.pumping_speed})
     end
     for i = 1, #entity.fluidbox do
-      -- game.print({"utilization-monitor-debuginfo-edsub", "fluidbox.get_flow", i, entity.fluidbox.get_flow(i)})
+      -- game.print({"ution-monitor-debuginfo-edsub", "fluidbox.get_flow", i, entity.fluidbox.get_flow(i)})
       -- game.print({"utilization-monitor-debuginfo-edsub", "fluidbox.get_connections", i, entity.fluidbox.get_connections(i)})
       game.print({"utilization-monitor-debuginfo-edsub", "fluidbox.get_capacity", i, entity.fluidbox.get_capacity(i)})
       if entity.fluidbox[i] == nil then
@@ -495,6 +501,8 @@ local function debugprint(entity)
   debugprinted("prototype.energy_usage", entity.prototype.energy_usage)
   debugprinted("consumption_bonus", entity.consumption_bonus)
   debugprinted("energy", entity.energy)
+  debugprinted("consumption_bonus", entity.consumption_bonus)
+  debugprinted("calc_energy_ratio", calc_energy_ratio(entity))
 end
 
 local function debuginfo()
