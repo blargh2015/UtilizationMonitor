@@ -308,8 +308,10 @@ local function add_entity(entity)
         local outtemp = data.entity.prototype.target_temperature      -- C
         local maxenergy = data.entity.prototype.get_max_energy_usage(entity.quality)      -- W = J/s 
         data.maxflow = maxenergy / ((outtemp - intemp) * inheat)
+      elseif entity.type == "pump" or entity.type == "offshore-pump" then
+        data.pumping_speed = data.entity.prototype.get_pumping_speed(data.entity.quality)
       end
-      
+
       -- Add object, emit warning if we just tripped over the limit per tick.
       storage.entity_data[id] = data
       if table_size(storage.entity_data) > storage.entity_rate_max and storage.max_warning ~= true then
@@ -354,15 +356,18 @@ local function working_value_calc(data)
   if data.type == "generator" then
     return data.entity.energy_generated_last_tick / data.mep
   elseif data.type == "offshore-pump" or data.type == "pump" then
+    -- Pump logic is very complex and weird since Factorio removed get_flow() in 2.0.  pumping_speed is 20 in the prototype
+    -- Configuration                                DisplayFlow Expected Value          fb1.capacity   fb1.amount 
+    -- Pump to/from rail with no car                0           0%                      400            nil 
+    -- Pump to/from rail with car with room         1200        100%                    400            20 if facing car, 60 to t
+    -- Pump to/from rail with car with 50% room     600         50%                     400            9.999
+    
     local fbc = data.entity.fluidbox.get_capacity(1)
-    local fb = data.entity.fluidbox[1]   -- this is nil if it's completely empty.
-    local fa = fbc
-    if fb ~= nil then
-      fa = fb.amount
-    else
-      fa = 0
+    local fb = data.entity.fluidbox[1]   -- this is nil if it's unconnected.
+    if fb == nil then
+      return 0
     end
-    return math.min(1.0, (fbc - fa) / data.entity.prototype.pumping_speed) * calc_energy_ratio(data.entity)
+    return math.min(1.0, (fbc - fb.amount) / data.pumping_speed) * calc_energy_ratio(data.entity)
   elseif data.type == "boiler" then
     -- If this is a burner and is operational, measure it by its heat
     if data.entity.burner ~= nil then
@@ -485,7 +490,7 @@ local function debugprint(entity)
   if entity.fluidbox.valid and #entity.fluidbox > 0 then  
     game.print({"utilization-monitor-debuginfo-ed", "#fluidbox", #entity.fluidbox})
     if entity.type == "pump" or entity.type == "offshore-pump" then
-      game.print({"utilization-monitor-debuginfo-ed", "prototype.pumping_speed", entity.prototype.pumping_speed})
+      game.print({"utilization-monitor-debuginfo-ed", "pumping_speed", entity.prototype.get_pumping_speed(entity.quality)})
     end
     for i = 1, #entity.fluidbox do
       -- game.print({"ution-monitor-debuginfo-edsub", "fluidbox.get_flow", i, entity.fluidbox.get_flow(i)})
@@ -608,22 +613,13 @@ local function on_tick(event)
   storage.last_id = id
 end
 
---- Event handler for newly build entities.
+--- Event handlers for newly built entities.
 --
 -- @param event:Event - The event contain the information about the newly build entity.
 --
 local function on_built(event)
   add_entity(event.entity)
 end
-
---- Event handler for script created entities.
---
--- @param event:Event - The event contain the information about the newly build entity.
---
-local function on_built_script(event)
-  add_entity(event.entity)
-end
-
 
 --- Event handler for destroyed entities.
 --
@@ -744,15 +740,21 @@ function add_event_handlers()
   event_filters = { {filter="type", type="assembling-machine"}, {filter="type", type="furnace"}, {filter="type", type="mining-drill"}, {filter="type", type="lab"}, {filter="type", type="boiler"},
     {filter="type", type="generator"}, {filter="type", type="reactor"}, {filter="type", type="offshore-pump"}, {filter="type", type="pump"}, {filter="name", name="utilization-monitor-statictext"} }
   script.on_event({defines.events.on_tick}, on_tick)
+
   script.on_event(defines.events.on_built_entity, on_built, event_filters)
   script.on_event(defines.events.on_robot_built_entity, on_built, event_filters)
-  script.on_event(defines.events.script_raised_built, on_built_script, event_filters)
-  script.on_event(defines.events.script_raised_revive, on_built_script, event_filters)
+  script.on_event(defines.events.script_raised_built, on_built, event_filters)
+  script.on_event(defines.events.script_raised_revive, on_built, event_filters)
+  script.on_event(defines.events.on_space_platform_built_entity, on_built, event_filters)
+
   script.on_event(defines.events.on_entity_died, on_destroyed, event_filters)
   script.on_event(defines.events.on_player_mined_entity, on_destroyed, event_filters)
   script.on_event(defines.events.on_robot_mined_entity, on_destroyed, event_filters)
   script.on_event(defines.events.script_raised_destroy, on_destroyed, event_filters)
+  script.on_event(defines.events.on_space_platform_mined_entity, on_destroyed, event_filters)
+
   script.on_event(defines.events.on_entity_cloned, on_cloned, event_filters)
+
   script.on_event("toggle-utilization-monitor-labels", on_toggle_utilization_monitor_labels)
   commands.add_command("umreset", {"utilization-monitor-help-reset"}, reset)
   commands.add_command("umstats", {"utilization-monitor-help-stats"}, stats)
@@ -763,7 +765,7 @@ function remove_event_handlers()
   script.on_event({defines.events.on_tick}, nil)
   script.on_event({defines.events.on_built_entity, defines.events.on_robot_built_entity, defines.events.script_raised_built, defines.events.script_raised_revive}, nil)
   script.on_event({defines.events.on_entity_died, defines.events.on_player_mined_entity, defines.events.on_robot_mined_entity, defines.events.script_raised_destroy}, nil)
-  script.on_event({defines.events.on_entity_cloned}, nil)
+  script.on_event({defines.events.on_entity_cloned, defines.events.on_space_platform_built_entity, defines.events.on_space_platform_mined_entity}, nil)
   script.on_event("toggle-utilization-monitor-labels", nil)
   commands.remove_command("umreset")
   commands.remove_command("umstats")
