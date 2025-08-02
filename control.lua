@@ -1,6 +1,6 @@
 -- The version of the data of this mod.
 -- If this value does not match the data have to be reset.
-local VERSION = "66"
+local VERSION = "67"
 --[[--
 UM data definition:
 
@@ -32,6 +32,9 @@ storage.color_spoolup : table
 
 -- Color for steady
 storage.color_steady : table
+
+-- Is pumped_last_tick available?
+storage.pumped_last_tick_available : boolean
 
 UMData:
 
@@ -356,18 +359,26 @@ local function working_value_calc(data)
   if data.type == "generator" then
     return data.entity.energy_generated_last_tick / data.mep
   elseif data.type == "offshore-pump" or data.type == "pump" then
+    -- If we have pumped_last_tick, this is much easier.
+    if storage.pumped_last_tick_available then
+      return data.entity.pumped_last_tick / data.entity.prototype.get_pumping_speed(data.entity.quality)
+    end
     -- Pump logic is very complex and weird since Factorio removed get_flow() in 2.0.  pumping_speed is 20 in the prototype
     -- Configuration                                DisplayFlow Expected Value          fb1.capacity   fb1.amount 
     -- Pump to/from rail with no car                0           0%                      400            nil 
     -- Pump to/from rail with car with room         1200        100%                    400            20 if facing car, 60 to t
     -- Pump to/from rail with car with 50% room     600         50%                     400            9.999
     
-    local fbc = data.entity.fluidbox.get_capacity(1)
-    local fb = data.entity.fluidbox[1]   -- this is nil if it's unconnected.
-    if fb == nil then
-      return 0
+    if data.entity.status ~= defines.entity_status.working then
+      return 0.0
+    else 
+      local fbc = data.entity.fluidbox.get_capacity(1)
+      local fb = data.entity.fluidbox[1]   -- this is nil if it's unconnected.
+      if fb == nil then
+        return 0
+      end
+      return math.min(1.0, (fbc - fb.amount) / data.pumping_speed) * calc_energy_ratio(data.entity)
     end
-    return math.min(1.0, (fbc - fb.amount) / data.pumping_speed) * calc_energy_ratio(data.entity)
   elseif data.type == "boiler" then
     -- If this is a burner and is operational, measure it by its heat
     if data.entity.burner ~= nil then
@@ -446,6 +457,12 @@ local function reset()
   storage = {}
   -- end cleanup
 
+  -- Is pumped_last_tick available?
+  if script.active_mods["base"] >= "2.0.62" then
+    storage.pumped_last_tick_available = true
+  else
+    storage.pumped_last_tick_available = false
+  end
   -- Purge new-style labels.
   rendering.clear("UtilizationMonitorBlargh")
 
@@ -494,7 +511,7 @@ local function debugprint(entity)
     end
     for i = 1, #entity.fluidbox do
       -- game.print({"ution-monitor-debuginfo-edsub", "fluidbox.get_flow", i, entity.fluidbox.get_flow(i)})
-      -- game.print({"utilization-monitor-debuginfo-edsub", "fluidbox.get_connections", i, entity.fluidbox.get_connections(i)})
+      -- game.print({"utilization-monitor-buginfo-edsub", "fluidbox.get_connections", i, entity.fluidbox.get_connections(i)})
       game.print({"utilization-monitor-debuginfo-edsub", "fluidbox.get_capacity", i, entity.fluidbox.get_capacity(i)})
       if entity.fluidbox[i] == nil then
         game.print({"utilization-monitor-debuginfo-edsub", "fluidbox.amount", i, "nil"})
@@ -502,6 +519,9 @@ local function debugprint(entity)
         game.print({"utilization-monitor-debuginfo-edsub", "fluidbox.amount", i, entity.fluidbox[i].amount})
       end
     end
+  end
+  if (entity.type == "pump" or entity.type == "offshore-pump") and storage.pumped_last_tick_available then
+    game.print({"utilization-monitor-debuginfo-ed", "pumped_last_tick", entity.pumped_last_tick})
   end
   debugprinted("prototype.energy_usage", entity.prototype.energy_usage)
   debugprinted("consumption_bonus", entity.consumption_bonus)

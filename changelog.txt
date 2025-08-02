@@ -1,4 +1,14 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.9.5
+Date: 2025.08.02
+  Features:
+    - Pumps now use the new pumped_last_tick LuaEntity function introduced in 2.0.62 to more accurately provide usage on pumps, if it is available. This makes pumps and offshore pumps accurate once more.
+---------------------------------------------------------------------------------------------------
+Version: 0.9.4
+Date: 2025.02.16
+  Bugfixes:
+    - Pumps controlled by signals are now tracked correctly.
+---------------------------------------------------------------------------------------------------
 Version: 0.9.3
 Date: 2025.01.12
   Bugfixes:
